@@ -79,18 +79,32 @@ botonEditar: {
 botonEliminar: {
   backgroundColor: '#F44336', // rojo
 },
+  textoBoton: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14
+  },
 
-textoBoton: {
-  color: '#fff',
-  fontWeight: 'bold',
-  fontSize: 14,
+botonFlotante: {
+  position: 'absolute',
+  bottom: 20,
+  right: 20,
+  backgroundColor: '#c21c1c',
+  width: 60,
+  height: 60,
+  borderRadius: 30,
+  justifyContent: 'center',
+  alignItems: 'center',
+  elevation: 5, // Para Android
+  shadowColor: '#000', // Para iOS
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.3,
+  shadowRadius: 3,
 },
 
-  botonNuevo: {
-    marginTop: 20,
-    backgroundColor: '#c21c1c',
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center'
-  }
+iconoFlotante: {
+  color: '#fff',
+  fontSize: 30,
+  fontWeight: 'bold',
+}
 });

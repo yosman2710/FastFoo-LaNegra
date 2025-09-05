@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   FlatList,
@@ -23,17 +24,21 @@ const GestionPlatillos = ({ navigation }) => {
   const [busqueda, setBusqueda] = useState('');
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    cargarPlatillos();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      cargarPlatillos();
+    }, [])
+  );
 
   useEffect(() => {
     const delayDebounce = setTimeout(() => {
       handleBuscar();
-    }, 300); // Espera 300ms después de escribir
+    }, 300);
 
     return () => clearTimeout(delayDebounce);
   }, [busqueda]);
+
+
 
   const cargarPlatillos = async () => {
     try {
@@ -124,19 +129,13 @@ const GestionPlatillos = ({ navigation }) => {
         />
       )}
 
-      <TouchableOpacity
-        style={styles.botonNuevo}
-        onPress={() => navigation.navigate('CrearPlatillo')}
-      >
-        <Text style={styles.textoBoton}>➕ Agregar platillo</Text>
-      </TouchableOpacity>
+<TouchableOpacity
+  style={styles.botonFlotante}
+  onPress={() => navigation.navigate('CrearPlatillo')}
+>
+  <Text style={styles.iconoFlotante}>＋</Text>
+</TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.botonNuevo}
-        onPress={cargarPlatillos}
-      >
-        <Text style={styles.textoBoton}>🔄 Recargar</Text>
-      </TouchableOpacity>
     </View>
   );
 };

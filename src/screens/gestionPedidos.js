@@ -121,18 +121,12 @@ const GestionPedidos = ({ navigation }) => {
         renderItem={renderItem}
       />
 
+      
       <TouchableOpacity
-        style={styles.botonNuevo}
+        style={styles.botonFlotante}
         onPress={() => navigation.navigate('CrearPedido')}
       >
-        <Text style={styles.textoBoton}>Nuevo Pedido</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.botonNuevo}
-        onPress={cargarPedidos}
-      >
-        <Text style={styles.textoBoton}>🔄 Recargar</Text>
+        <Text style={styles.iconoFlotante}>＋</Text>
       </TouchableOpacity>
     </View>
   );

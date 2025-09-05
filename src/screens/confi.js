@@ -1,6 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { obtenerPlatillos, actualizarPlatillo } from '../services/dishService';
+
+const actualizarPreciosBolivares = async (nuevaTasa) => {
+  try {
+    const platillos = await obtenerPlatillos();
+
+    for (const p of platillos) {
+      if (p.precioUsd != null) {
+        const nuevoBs = parseFloat((p.precioUsd * nuevaTasa).toFixed(2));
+        const actualizado = { ...p, precioBs: nuevoBs };
+        await actualizarPlatillo(p.id, actualizado);
+      }
+    }
+
+    console.log('✅ Precios Bs actualizados');
+  } catch (error) {
+    console.error('❌ Error al actualizar precios Bs:', error);
+  }
+};
+
 
 const Configuracion = () => {
   const [tasa, setTasa] = useState('');
@@ -17,7 +37,9 @@ const Configuracion = () => {
     const valor = parseFloat(tasa);
     if (!isNaN(valor) && valor > 0) {
       await AsyncStorage.setItem('tasa_dolar', valor.toString());
-      Alert.alert('✅ Tasa guardada', `1 USD = ${valor} Bs`);
+       await actualizarPreciosBolivares(valor); 
+     Alert.alert('✅ Tasa actualizada', `1 USD = ${valor} Bs\nLos precios en Bs fueron recalculados`);
+
     } else {
       Alert.alert('⚠️ Valor inválido', 'Ingresa un número mayor a 0');
     }

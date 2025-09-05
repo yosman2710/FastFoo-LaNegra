@@ -20,7 +20,7 @@ const DEFAULT_IMAGE = Image.resolveAssetSource(require('../../assets/default-dis
 const CrearPlatillo = ({ navigation }) => {
   const [nombre, setNombre] = useState('');
   const [monto, setMonto] = useState('');
-  const [moneda, setMoneda] = useState('usd'); // 'usd' o 'bs'
+  const [moneda, setMoneda] = useState('usd');
   const [descripcion, setDescripcion] = useState('');
   const [imagen, setImagen] = useState('');
   const [tasa, setTasa] = useState(null);
@@ -69,56 +69,56 @@ const CrearPlatillo = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView>
+    <SafeAreaView style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.titulo}>Crear Nuevo Platillo</Text>
 
-      <Text style={styles.label}>Nombre del Platillo</Text>
-      <TextInput
-        style={styles.input}
-        value={nombre}
-        onChangeText={setNombre}
-      />
-
-      <Text style={styles.label}>Moneda del Precio</Text>
-      <Picker
-        selectedValue={moneda}
-        onValueChange={(value) => setMoneda(value)}
-        style={styles.input}
-      >
-        <Picker.Item label="Dólares (USD)" value="usd" />
-        <Picker.Item label="Bolívares (Bs)" value="bs" />
-      </Picker>
-
-      <Text style={styles.label}>Monto en {moneda === 'usd' ? 'USD' : 'Bs'}</Text>
-      <TextInput
-        style={styles.input}
-        keyboardType="numeric"
-        value={monto}
-        onChangeText={setMonto}
-        placeholder={`Ej: ${moneda === 'usd' ? '4.50' : '180.00'}`}
-      />
-
-      <Text style={styles.label}>Descripción</Text>
-      <TextInput
-        style={[styles.input, { height: 80 }]}
-        multiline
-        value={descripcion}
-        onChangeText={setDescripcion}
-      />
-
-      <Text style={styles.label}>Imagen del Platillo</Text>
-      <TouchableOpacity style={styles.imageContainer} onPress={seleccionarImagen}>
-        <Image
-          source={{ uri: imagen || DEFAULT_IMAGE }}
-          style={{ width: '100%', height: '100%', borderRadius: 10 }}
+        <Text style={styles.label}>Nombre del Platillo</Text>
+        <TextInput
+          style={styles.input}
+          value={nombre}
+          onChangeText={setNombre}
         />
-      </TouchableOpacity>
 
-      <TouchableOpacity style={styles.botonGuardar} onPress={handleGuardar}>
-        <Text style={styles.textoBoton}>Guardar Platillo</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        <Text style={styles.label}>Moneda del Precio</Text>
+        <Picker
+          selectedValue={moneda}
+          onValueChange={(value) => setMoneda(value)}
+          style={styles.input}
+        >
+          <Picker.Item label="Dólares (USD)" value="usd" />
+          <Picker.Item label="Bolívares (Bs)" value="bs" />
+        </Picker>
+
+        <Text style={styles.label}>Monto en {moneda === 'usd' ? 'USD' : 'Bs'}</Text>
+        <TextInput
+          style={styles.input}
+          keyboardType="numeric"
+          value={monto}
+          onChangeText={setMonto}
+          placeholder={`Ej: ${moneda === 'usd' ? '4.50' : '180.00'}`}
+        />
+
+        <Text style={styles.label}>Descripción</Text>
+        <TextInput
+          style={[styles.input, { height: 80 }]}
+          multiline
+          value={descripcion}
+          onChangeText={setDescripcion}
+        />
+
+        <Text style={styles.label}>Imagen del Platillo</Text>
+        <TouchableOpacity style={styles.imageContainer} onPress={seleccionarImagen}>
+          <Image
+            source={{ uri: imagen || DEFAULT_IMAGE }}
+            style={{ width: '100%', height: '100%', borderRadius: 10 }}
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.botonGuardar} onPress={handleGuardar}>
+          <Text style={styles.textoBoton}>Guardar Platillo</Text>
+        </TouchableOpacity>
+      </ScrollView>
     </SafeAreaView>
   );
 };
