@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,9 +6,12 @@ import {
   TouchableOpacity,
   Image,
   Alert,
-  ScrollView
+  ScrollView,
+  SafeAreaView
 } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Picker } from '@react-native-picker/picker';
 import { insertarPlatillo } from '../services/dishService.js';
 import { styles } from '../styles/crearPlatillos.styles.js';
 
@@ -16,9 +19,19 @@ const DEFAULT_IMAGE = Image.resolveAssetSource(require('../../assets/default-dis
 
 const CrearPlatillo = ({ navigation }) => {
   const [nombre, setNombre] = useState('');
-  const [precio, setPrecio] = useState('');
+  const [monto, setMonto] = useState('');
+  const [moneda, setMoneda] = useState('usd'); // 'usd' o 'bs'
   const [descripcion, setDescripcion] = useState('');
   const [imagen, setImagen] = useState('');
+  const [tasa, setTasa] = useState(null);
+
+  useEffect(() => {
+    const cargarTasa = async () => {
+      const valor = await AsyncStorage.getItem('tasa_dolar');
+      if (valor) setTasa(parseFloat(valor));
+    };
+    cargarTasa();
+  }, []);
 
   const seleccionarImagen = async () => {
     const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.6 });
@@ -28,14 +41,19 @@ const CrearPlatillo = ({ navigation }) => {
   };
 
   const handleGuardar = async () => {
-    if (!nombre.trim() || isNaN(precio) || parseFloat(precio) <= 0) {
-      Alert.alert('Error', 'Nombre y precio válidos son obligatorios');
+    const montoNum = parseFloat(monto);
+    if (!nombre.trim() || isNaN(montoNum) || montoNum <= 0 || !tasa) {
+      Alert.alert('Error', 'Nombre, precio válido y tasa de cambio son obligatorios');
       return;
     }
 
+    const precioUsd = moneda === 'usd' ? montoNum : parseFloat((montoNum / tasa).toFixed(2));
+    const precioBs = moneda === 'bs' ? montoNum : parseFloat((montoNum * tasa).toFixed(2));
+
     const nuevoPlatillo = {
       nombre,
-      precio: parseFloat(precio),
+      precioUsd,
+      precioBs,
       descripcion,
       imagen: imagen || DEFAULT_IMAGE
     };
@@ -51,8 +69,9 @@ const CrearPlatillo = ({ navigation }) => {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.titulo}>Crear Nuevo Platillo</Text>
+    <SafeAreaView>
+      <ScrollView contentContainerStyle={styles.container}>
+        <Text style={styles.titulo}>Crear Nuevo Platillo</Text>
 
       <Text style={styles.label}>Nombre del Platillo</Text>
       <TextInput
@@ -61,12 +80,23 @@ const CrearPlatillo = ({ navigation }) => {
         onChangeText={setNombre}
       />
 
-      <Text style={styles.label}>Precio</Text>
+      <Text style={styles.label}>Moneda del Precio</Text>
+      <Picker
+        selectedValue={moneda}
+        onValueChange={(value) => setMoneda(value)}
+        style={styles.input}
+      >
+        <Picker.Item label="Dólares (USD)" value="usd" />
+        <Picker.Item label="Bolívares (Bs)" value="bs" />
+      </Picker>
+
+      <Text style={styles.label}>Monto en {moneda === 'usd' ? 'USD' : 'Bs'}</Text>
       <TextInput
         style={styles.input}
         keyboardType="numeric"
-        value={precio}
-        onChangeText={setPrecio}
+        value={monto}
+        onChangeText={setMonto}
+        placeholder={`Ej: ${moneda === 'usd' ? '4.50' : '180.00'}`}
       />
 
       <Text style={styles.label}>Descripción</Text>
@@ -89,6 +119,7 @@ const CrearPlatillo = ({ navigation }) => {
         <Text style={styles.textoBoton}>Guardar Platillo</Text>
       </TouchableOpacity>
     </ScrollView>
+    </SafeAreaView>
   );
 };
 

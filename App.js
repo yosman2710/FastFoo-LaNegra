@@ -7,8 +7,6 @@ import EditarPlatillos from './src/screens/editarPlatillos';
 import CrearPedido from './src/screens/crearPedidos';
 import VerDetallesPedidos from './src/screens/verDetallesPedidos';
 import TabNavigator from './src/navegation/tabNavegation';
-import { enableScreens } from 'react-native-screens';
-enableScreens();
 const Stack = createNativeStackNavigator();
 
 export default function App() {

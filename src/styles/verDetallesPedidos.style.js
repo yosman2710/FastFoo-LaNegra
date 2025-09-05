@@ -25,8 +25,8 @@ export const styles = StyleSheet.create({
     color: '#2a2a8f',
   },
   lista: {
-    maxHeight: 350, // 👈 limita la altura de la lista
-    marginBottom: 16
+    maxHeight: 350,
+    marginBottom: 16,
   },
   item: {
     marginBottom: 10,
@@ -67,23 +67,29 @@ export const styles = StyleSheet.create({
     color: '#d22',
     marginTop: 4,
   },
+  botonFila: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 20,
+  },
   botonAbonar: {
+    flex: 1,
     backgroundColor: '#6c2aa8',
     padding: 12,
     borderRadius: 8,
-    marginTop: 20,
   },
   botonAgregar: {
+    flex: 1,
     backgroundColor: '#2196F3',
     padding: 12,
     borderRadius: 8,
-    marginTop: 12,
   },
   botonGuardar: {
     backgroundColor: '#4CAF50',
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 12,
+    padding: 14,
+    borderRadius: 10,
+    marginTop: 24,
   },
   botonTexto: {
     color: '#fff',
@@ -136,4 +142,11 @@ export const styles = StyleSheet.create({
     fontWeight: 'bold',
     overflow: 'hidden',
   },
+  botonCompletar: {
+  backgroundColor: '#04d5ffff',
+  padding: 12,
+  borderRadius: 8,
+  marginTop: 20,
+  alignItems: 'center',
+},
 });

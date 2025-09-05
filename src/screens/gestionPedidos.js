@@ -23,8 +23,11 @@ const GestionPedidos = ({ navigation }) => {
   );
 
   const actualizarEstado = (pedido) => {
-    if (!pedido.pagado || pedido.pagado === 0) return 'pendiente';
-    if (pedido.pagado < pedido.total) return 'abonado';
+    const pagado = pedido.pagadoUsd ?? 0;
+    const total = pedido.totalUsd ?? 0;
+
+    if (pagado === 0) return 'pendiente';
+    if (pagado < total) return 'abonado';
     return 'completado';
   };
 
@@ -60,28 +63,28 @@ const GestionPedidos = ({ navigation }) => {
   };
 
   const getEstadoColor = (estado) => {
-  switch (estado) {
-    case 'pendiente':
-      return '#e53935'; // rojo
-    case 'abonado':
-      return '#fb8c00'; // naranja
-    case 'completado':
-      return '#43a047'; // verde
-    default:
-      return '#000';
-  }
-};
+    switch (estado) {
+      case 'pendiente':
+        return '#e53935';
+      case 'abonado':
+        return '#fb8c00';
+      case 'completado':
+        return '#43a047';
+      default:
+        return '#000';
+    }
+  };
 
   const renderItem = ({ item }) => (
     <View style={styles.card}>
       <Text style={styles.id}>Pedido #{item.id}</Text>
       <Text style={styles.nombre}>Nombre: {item.clientName}</Text>
-      <Text style={styles.total}>Total: ${item.total.toFixed(2)}</Text>
+      <Text style={styles.total}>Total: ${item.totalUsd?.toFixed(2)}</Text>
+      <Text style={styles.pagado}>Pagado: ${item.pagadoUsd?.toFixed(2) ?? 0}</Text>
       <Text style={styles.fecha}>Fecha: {new Date(item.createdAt).toLocaleDateString()}</Text>
       <Text style={[styles.estado, { color: getEstadoColor(item.estado) }]}>
-      Estado: {item.estado}
-    </Text>
-
+        Estado: {item.estado}
+      </Text>
 
       <View style={styles.acciones}>
         <TouchableOpacity

@@ -9,6 +9,8 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Picker } from '@react-native-picker/picker';
 import { obtenerPlatilloPorId, actualizarPlatillo } from '../services/dishService.js';
 import { styles } from '../styles/crearPlatillos.styles.js';
 
@@ -17,9 +19,11 @@ const EditarPlatillos = ({ route, navigation }) => {
 
   const [platillo, setPlatillo] = useState(null);
   const [nombre, setNombre] = useState('');
-  const [precio, setPrecio] = useState('');
+  const [monto, setMonto] = useState('');
+  const [moneda, setMoneda] = useState('usd');
   const [descripcion, setDescripcion] = useState('');
   const [imagen, setImagen] = useState('');
+  const [tasa, setTasa] = useState(null);
 
   useEffect(() => {
     const cargarDatos = async () => {
@@ -32,24 +36,47 @@ const EditarPlatillos = ({ route, navigation }) => {
 
       setPlatillo(datos);
       setNombre(datos.nombre);
-      setPrecio(datos.precio.toString());
       setDescripcion(datos.descripcion || '');
       setImagen(datos.imagen);
+
+      const tasaGuardada = await AsyncStorage.getItem('tasa_dolar');
+      if (tasaGuardada) setTasa(parseFloat(tasaGuardada));
+
+      // Detectar moneda original
+      if (datos.precioUsd) {
+        setMoneda('usd');
+        setMonto(datos.precioUsd.toString());
+      } else if (datos.precioBs) {
+        setMoneda('bs');
+        setMonto(datos.precioBs.toString());
+      }
     };
 
     cargarDatos();
   }, [id]);
 
+  const seleccionarImagen = async () => {
+    const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.6 });
+    if (result.assets && result.assets.length > 0) {
+      setImagen(result.assets[0].uri);
+    }
+  };
+
   const handleGuardar = async () => {
-    if (!nombre.trim() || isNaN(precio) || parseFloat(precio) <= 0) {
-      Alert.alert('Error', 'Nombre y precio válidos son obligatorios');
+    const montoNum = parseFloat(monto);
+    if (!nombre.trim() || isNaN(montoNum) || montoNum <= 0 || !tasa) {
+      Alert.alert('Error', 'Nombre, precio válido y tasa de cambio son obligatorios');
       return;
     }
+
+    const precioUsd = moneda === 'usd' ? montoNum : parseFloat((montoNum / tasa).toFixed(2));
+    const precioBs = moneda === 'bs' ? montoNum : parseFloat((montoNum * tasa).toFixed(2));
 
     const platilloActualizado = {
       ...platillo,
       nombre,
-      precio: parseFloat(precio),
+      precioUsd,
+      precioBs,
       imagen,
       descripcion
     };
@@ -61,13 +88,6 @@ const EditarPlatillos = ({ route, navigation }) => {
     } catch (error) {
       Alert.alert('Error', 'No se pudo actualizar el platillo');
       console.error(error);
-    }
-  };
-
-  const seleccionarImagen = async () => {
-    const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.6 });
-    if (result.assets && result.assets.length > 0) {
-      setImagen(result.assets[0].uri);
     }
   };
 
@@ -83,7 +103,6 @@ const EditarPlatillos = ({ route, navigation }) => {
   return (
     <View style={styles.container}>
       <Text style={styles.titulo}>Editar Platillo</Text>
-
       <Text style={styles.seccionTitulo}>Información del Platillo</Text>
 
       <Text style={styles.label}>Nombre del Platillo</Text>
@@ -93,12 +112,23 @@ const EditarPlatillos = ({ route, navigation }) => {
         onChangeText={setNombre}
       />
 
-      <Text style={styles.label}>Precio</Text>
+      <Text style={styles.label}>Moneda del Precio</Text>
+      <Picker
+        selectedValue={moneda}
+        onValueChange={(value) => setMoneda(value)}
+        style={styles.input}
+      >
+        <Picker.Item label="Dólares (USD)" value="usd" />
+        <Picker.Item label="Bolívares (Bs)" value="bs" />
+      </Picker>
+
+      <Text style={styles.label}>Monto en {moneda === 'usd' ? 'USD' : 'Bs'}</Text>
       <TextInput
         style={styles.input}
         keyboardType="numeric"
-        value={precio}
-        onChangeText={setPrecio}
+        value={monto}
+        onChangeText={setMonto}
+        placeholder={`Ej: ${moneda === 'usd' ? '4.50' : '180.00'}`}
       />
 
       <Text style={styles.label}>Descripción</Text>
