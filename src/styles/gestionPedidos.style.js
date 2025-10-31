@@ -100,5 +100,20 @@ iconoFlotante: {
   color: '#fff',
   fontSize: 30,
   fontWeight: 'bold',
+},
+estadoBadge: {
+  paddingHorizontal: 10,
+  paddingVertical: 4,
+  borderRadius: 12,
+  color: '#fff',
+  fontWeight: 'bold',
+  fontSize: 12,
+  overflow: 'hidden',
+  textTransform: 'uppercase'
+},
+pagado: {
+  fontSize: 15,
+  marginTop: 4,
+  color: '#666'
 }
 });

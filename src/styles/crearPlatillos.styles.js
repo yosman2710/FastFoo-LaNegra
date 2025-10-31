@@ -51,15 +51,18 @@ export const styles = StyleSheet.create({
     height: 40,
     tintColor: '#FFF'
   },
-  botonGuardar: {
-    backgroundColor: '#D7263D', // rojo para llamar la atención
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center'
-  },
-  textoBoton: {
-    color: '#FFF',
-    fontWeight: 'bold',
-    fontSize: 16
-  }
+botonGuardarArribaDerecha: {
+  backgroundColor: '#D7263D',
+  paddingHorizontal: 16,
+  paddingVertical: 10,
+  borderRadius: 20,
+  alignSelf: 'flex-end',
+  marginBottom: 10
+},
+textoBotonArribaDerecha: {
+  color: '#FFF',
+  fontWeight: 'bold',
+  fontSize: 14
+}
+
 });

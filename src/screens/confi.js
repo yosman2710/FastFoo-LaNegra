@@ -1,85 +1,95 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { obtenerPlatillos, actualizarPlatillo } from '../services/dishService';
+// Eliminamos: import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const actualizarPreciosBolivares = async (nuevaTasa) => {
-  try {
-    const platillos = await obtenerPlatillos();
+// Importamos las nuevas funciones de Supabase
+import { obtenerTasaDolar, actualizarTasaDolar } from '../services/configService.js'; 
 
-    for (const p of platillos) {
-      if (p.precioUsd != null) {
-        const nuevoBs = parseFloat((p.precioUsd * nuevaTasa).toFixed(2));
-        const actualizado = { ...p, precioBs: nuevoBs };
-        await actualizarPlatillo(p.id, actualizado);
-      }
-    }
-
-    console.log('✅ Precios Bs actualizados');
-  } catch (error) {
-    console.error('❌ Error al actualizar precios Bs:', error);
-  }
-};
-
+// -----------------------------------------------------------------
+// FUNCIÓN ELIMINADA: actualizarPreciosBolivares
+// (Ya no es necesaria. La app calcula los Bs en tiempo real.)
+// -----------------------------------------------------------------
 
 const Configuracion = () => {
-  const [tasa, setTasa] = useState('');
+    const [tasa, setTasa] = useState('');
+    
+    // Función de carga (Reemplaza la lectura de AsyncStorage)
+    useEffect(() => {
+        const cargarTasa = async () => {
+            try {
+                // Leer la tasa desde la tabla 'configuracion' de Supabase
+                const guardada = await obtenerTasaDolar();
+                if (guardada) {
+                    setTasa(guardada); // 'guardada' ya viene como string
+                }
+            } catch (error) {
+                console.error('Error al cargar tasa:', error);
+                Alert.alert('Error', 'No se pudo cargar la tasa de dólar desde la nube.');
+            }
+        };
+        cargarTasa();
+    }, []);
 
-  useEffect(() => {
-    const cargarTasa = async () => {
-      const guardada = await AsyncStorage.getItem('tasa_dolar');
-      if (guardada) setTasa(guardada);
+    // Función de guardado (Reemplaza la escritura en AsyncStorage)
+    const guardarTasa = async () => {
+        const valor = parseFloat(tasa);
+        
+        if (!isNaN(valor) && valor > 0) {
+            try {
+                // 1. Guardar la nueva tasa en la tabla 'configuracion' de Supabase
+                await actualizarTasaDolar(valor.toFixed(2).toString()); // Guardamos con 2 decimales como string
+
+                // 2. Notificación
+                Alert.alert('✅ Tasa actualizada', `1 USD = ${valor.toFixed(2)} Bs\nLa tasa se ha guardado en la nube.`);
+                
+                // NOTA: Los demás dispositivos que usen obtenerTasaDolar
+                // verán este cambio automáticamente.
+
+            } catch (error) {
+                console.error('Error al guardar la tasa en Supabase:', error);
+                Alert.alert('Error', 'No se pudo guardar la tasa de dólar en la nube.');
+            }
+
+        } else {
+            Alert.alert('⚠️ Valor inválido', 'Ingresa un número mayor a 0');
+        }
     };
-    cargarTasa();
-  }, []);
 
-  const guardarTasa = async () => {
-    const valor = parseFloat(tasa);
-    if (!isNaN(valor) && valor > 0) {
-      await AsyncStorage.setItem('tasa_dolar', valor.toString());
-       await actualizarPreciosBolivares(valor); 
-     Alert.alert('✅ Tasa actualizada', `1 USD = ${valor} Bs\nLos precios en Bs fueron recalculados`);
-
-    } else {
-      Alert.alert('⚠️ Valor inválido', 'Ingresa un número mayor a 0');
-    }
-  };
-
-  return (
-    <View style={styles.container}>
-      <Text style={styles.label}>Tasa actual del dólar (Bs):</Text>
-      <TextInput
-        style={styles.input}
-        keyboardType="numeric"
-        value={tasa}
-        onChangeText={setTasa}
-        placeholder="Ej: 40.00"
-      />
-      <TouchableOpacity style={styles.boton} onPress={guardarTasa}>
-        <Text style={styles.botonTexto}>Guardar</Text>
-      </TouchableOpacity>
-    </View>
-  );
+    return (
+        <View style={styles.container}>
+            <Text style={styles.label}>Tasa actual del dólar (Bs):</Text>
+            <TextInput
+                style={styles.input}
+                keyboardType="numeric"
+                value={tasa}
+                onChangeText={setTasa}
+                placeholder="Ej: 40.00"
+            />
+            <TouchableOpacity style={styles.boton} onPress={guardarTasa}>
+                <Text style={styles.botonTexto}>Guardar</Text>
+            </TouchableOpacity>
+        </View>
+    );
 };
 
 const styles = StyleSheet.create({
-  container: { padding: 40, backgroundColor: '#ffe6ea', flex: 1 },
-  label: { fontSize: 16, marginBottom: 20 },
-  input: {
-    backgroundColor: '#fff',
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    marginBottom: 20
-  },
-  boton: {
-    backgroundColor: '#4CAF50',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center'
-  },
-  botonTexto: { color: '#fff', fontWeight: 'bold' }
+    container: { padding: 40, backgroundColor: '#ffe6ea', flex: 1 },
+    label: { fontSize: 16, marginBottom: 20 },
+    input: {
+        backgroundColor: '#fff',
+        padding: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#ccc',
+        marginBottom: 20
+    },
+    boton: {
+        backgroundColor: '#4CAF50',
+        padding: 12,
+        borderRadius: 8,
+        alignItems: 'center'
+    },
+    botonTexto: { color: '#fff', fontWeight: 'bold' }
 });
 
 export default Configuracion;
