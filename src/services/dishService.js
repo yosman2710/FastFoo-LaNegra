@@ -34,24 +34,35 @@ export const insertarPlatillo = async (platillo) => {
     return data;
 };
 
-// -----------------------------------------------------------------
-// 2. OBTENER PLATILLOS (SELECT)
-// -----------------------------------------------------------------
+// ... en src/services/platillosService.js (Función obtenerPlatillos)
+
 export const obtenerPlatillos = async () => {
-    // Obtenemos todos los platillos ordenados por nombre y solo los activos
-    const { data, error } = await supabase
-        .from(PLATILLOS_TABLE)
-        .select('*')
-        .eq('activo', true) // Solo platillos activos
-        .order('nombre', { ascending: true }); // Ordenar alfabéticamente
+    try {
+        const { data, error } = await supabase
+            .from(PLATILLOS_TABLE)
+            .select('*')
+            .order('nombre', { ascending: true });
 
-    if (error) {
+        if (error) throw error;
+        
+        // **Mapeo de Supabase (snake_case) a la UI (camelCase)**
+        return (data || []).map(platillo => ({
+            ...platillo,
+            id: platillo.id, 
+            nombre: platillo.nombre,
+            descripcion: platillo.descripcion,
+            // Mapeo crucial para la lista de gestión
+            precioUsd: platillo.precio_usd, 
+            imagen: platillo.imagen_url,    
+        }));
+        
+    } catch (error) {
         console.error('Error al obtener platillos:', error);
-        return []; // Retornar array vacío en caso de error
+        return [];
     }
-
-    return data;
 };
+
+
 
 // -----------------------------------------------------------------
 // 3. ACTUALIZAR PLATILLO (UPDATE)

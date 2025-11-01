@@ -1,6 +1,6 @@
 // src/services/configService.js
 
-import { supabase } from '../lib/supabase'; // Asegúrate de que esta ruta a tu cliente Supabase sea correcta
+import { supabase } from '../utils/supabase'; // Asegúrate de que esta ruta a tu cliente Supabase sea correcta
 
 const CONFIG_TABLE = 'configuracion';
 const TASA_CLAVE = 'tasa_dolar';

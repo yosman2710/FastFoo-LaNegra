@@ -1,48 +1,35 @@
 import React, { useState, useEffect, useCallback } from 'react';
-// ELIMINAMOS: import AsyncStorage from '@react-native-async-storage/async-storage'; 
+import { useFocusEffect } from '@react-navigation/native'; 
 import {
     View,
     Text,
     FlatList,
     TextInput,
     TouchableOpacity,
-    Alert
+    Alert,
+    ActivityIndicator
 } from 'react-native';
 
-
-// Importamos el cliente Supabase para la función Realtime
+// Importa tus servicios y utilidades
 import { supabase } from '../utils/supabase.js'; 
-
-// Importamos servicios de Supabase (asumimos que ya están migrados)
 import { obtenerPedidos, eliminarPedido } from '../services/orderServices.js'; 
-import { styles } from '../styles/gestionPedidos.style.js';
+import { styles } from '../styles/gestionPedidos.style.js'; // Asegúrate de que esta ruta sea correcta
 
 const GestionPedidos = ({ navigation }) => {
     const [pedidos, setPedidos] = useState([]);
     const [busqueda, setBusqueda] = useState('');
+    const [isLoading, setIsLoading] = useState(true);
 
-    // Función para determinar el estado (lógica ya existente)
-    const actualizarEstado = (pedido) => {
-        // Usamos los campos que vienen de la BD, asumiendo snake_case o el mapeo
-        const pagado = pedido.pagado_usd ?? pedido.pagadoUsd ?? 0;
-        const total = pedido.total_usd ?? pedido.totalUsd ?? 0; 
-
-        if (pagado === 0) return 'pendiente';
-        if (pagado < total) return 'abonado';
-        return 'completado';
-    };
-
-    // Función que se encarga de cargar y actualizar la lista de pedidos
-    // Esta función será llamada por la suscripción Realtime
-    const cargarPedidos = async () => {
+    // FUNCIÓN CENTRAL: Carga de pedidos con useCallback para eficiencia
+    const cargarPedidos = useCallback(async () => {
         try {
-            // La función 'obtenerPedidos' obtiene la data de Supabase
             const data = await obtenerPedidos(); 
             
+            // Mapeo: Aseguramos el estado, y aquí TOTAL y PAGADO ya deberían ser 0 si son null 
+            // gracias al servicio obtenerPedidos.
             const actualizados = data.map(p => ({
                 ...p,
-                // totalUsd y pagadoUsd deben venir ya del servicio Supabase
-                estado: actualizarEstado(p) 
+                estado: p.estado || 'pendiente' 
             }));
             
             // Revertir el orden para mostrar el más nuevo primero
@@ -51,38 +38,39 @@ const GestionPedidos = ({ navigation }) => {
         } catch (error) {
             console.error("Error al cargar pedidos:", error);
             Alert.alert("Error de Conexión", "No se pudieron cargar los pedidos desde la nube.");
+        } finally {
+            setIsLoading(false);
         }
-    };
+    }, []); 
 
-
-    // 📢 IMPLEMENTACIÓN DE TIEMPO REAL (REALTIME)
+    // 1. RECUPERAR DATOS AL ENFOCAR (Recarga al volver de crear/editar)
+    useFocusEffect(
+        useCallback(() => {
+            cargarPedidos();
+            return () => {}; 
+        }, [cargarPedidos])
+    );
+    
+    // 2. MANTENER TIEMPO REAL (Realtime para cambios externos)
     useEffect(() => {
-        // 1. Carga inicial de datos al montar
-        cargarPedidos(); 
-
-        // 2. Suscripción a cambios en la tabla 'pedidos'
         const subscription = supabase
-            .channel('pedidos-channel') // Nombre único para el canal
+            .channel('pedidos-channel')
             .on(
                 'postgres_changes', 
                 { event: '*', schema: 'public', table: 'pedidos' },
-                (payload) => {
-                    // Cuando hay un cambio (INSERT, UPDATE, DELETE), recargar la lista
-                    console.log('Cambio en Pedidos detectado:', payload.eventType);
+                () => {
                     cargarPedidos(); 
                 }
             )
             .subscribe();
 
-        // 3. Limpieza: Desuscribirse al desmontar el componente
         return () => {
             supabase.removeChannel(subscription);
         };
-    }, []); // El array de dependencia vacío asegura que se ejecute solo una vez
+    }, [cargarPedidos]); 
 
-
+    // Función de filtrado
     const filtrarPedidos = () => {
-        // La búsqueda se hace sobre el estado actual, que se mantiene sincronizado por Realtime
         return pedidos.filter(p =>
             (p.clientName?.toLowerCase().includes(busqueda.toLowerCase()) ||
             p.cliente_nombre?.toLowerCase().includes(busqueda.toLowerCase())) ||
@@ -90,6 +78,7 @@ const GestionPedidos = ({ navigation }) => {
         );
     };
 
+    // Función para eliminar
     const handleEliminarPedido = async (id) => {
         Alert.alert('¿Eliminar?', '¿Deseas eliminar este pedido de la nube?', [
             { text: 'Cancelar', style: 'cancel' },
@@ -98,9 +87,7 @@ const GestionPedidos = ({ navigation }) => {
                 style: 'destructive',
                 onPress: async () => {
                     try {
-                        // Usamos la función de servicio Supabase
                         await eliminarPedido(id); 
-                        // Realtime recargará automáticamente la lista.
                         Alert.alert('✅ Éxito', 'Pedido eliminado. Sincronizando...');
                     } catch (error) {
                         console.error('Error al eliminar pedido:', error);
@@ -111,48 +98,64 @@ const GestionPedidos = ({ navigation }) => {
         ]);
     };
 
+    // Función para color de estado
     const getEstadoColor = (estado) => {
         switch (estado) {
             case 'pendiente': return '#e53935';
             case 'abonado': return '#fb8c00';
             case 'completado': return '#43a047';
+            case 'cancelado': return '#757575';
             default: return '#000';
         }
     };
 
-   const renderItem = ({ item }) => (
-    <View style={styles.card}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        {/* Asumimos que el ID es un UUID/String */}
-        <Text style={styles.id}>#{item.id.substring(0, 8)}...</Text> 
-        <Text style={[styles.estadoBadge, { backgroundColor: getEstadoColor(item.estado) }]}>
-          {item.estado.toUpperCase()}
-        </Text>
-      </View>
+    // FUNCIÓN RENDER: Muestra cada ítem de pedido
+    const renderItem = ({ item }) => {
+        const totalUsd = Number(item.totalUsd ?? item.total_usd ?? 0).toFixed(2);
+        const pagadoUsd = Number(item.pagadoUsd ?? item.monto_abonado_usd ?? 0).toFixed(2);
 
-      {/* Usamos los campos mapeados (clientName, totalUsd) o los de la BD (cliente_nombre, total_usd) */}
-      <Text style={styles.nombre}>👤 {item.clientName || item.cliente_nombre}</Text>
-      <Text style={styles.total}>💰 Total: ${item.totalUsd?.toFixed(2) ?? item.total_usd?.toFixed(2)}</Text>
-      <Text style={styles.pagado}>🧾 Pagado: ${item.pagadoUsd?.toFixed(2) ?? item.pagado_usd?.toFixed(2) ?? 0}</Text>
-      <Text style={styles.fecha}>📅 {new Date(item.created_at || item.createdAt).toLocaleDateString()}</Text>
+        return (
+            <View style={styles.card}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={styles.id}>#{item.id.substring(0, 8)}...</Text> 
+                    <Text style={[styles.estadoBadge, { backgroundColor: getEstadoColor(item.estado) }]}>
+                        {item.estado.toUpperCase()}
+                    </Text>
+                </View>
 
-      <View style={styles.acciones}>
-        <TouchableOpacity
-          style={styles.botonVer}
-          onPress={() => navigation.navigate('DetallePedido', { pedido: item })}
-        >
-          <Text style={styles.textoBoton}>Ver</Text>
-        </TouchableOpacity>
+                <Text style={styles.nombre}>👤 {item.clientName || item.cliente_nombre}</Text>
+                {/* SIN ASTERISCOS y valores numéricos garantizados */}
+                <Text style={styles.total}>💰 Total: ${totalUsd}</Text>
+                <Text style={styles.pagado}>🧾 Pagado: ${pagadoUsd}</Text>
+                <Text style={styles.fecha}>📅 {new Date(item.created_at || item.createdAt).toLocaleDateString()}</Text>
 
-        <TouchableOpacity
-          style={styles.botonEliminar}
-          onPress={() => handleEliminarPedido(item.id)}
-        >
-          <Text style={styles.textoBoton}>Eliminar</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-);
+                <View style={styles.acciones}>
+                    <TouchableOpacity
+                        style={styles.botonVer}
+                        onPress={() => navigation.navigate('DetallePedido', { id: item.id })}
+                    >
+                        <Text style={styles.textoBoton}>Ver</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.botonEliminar}
+                        onPress={() => handleEliminarPedido(item.id)}
+                    >
+                        <Text style={styles.textoBoton}>Eliminar</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        );
+    };
+    
+    if (isLoading) {
+        return (
+            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color="#000" />
+                <Text style={{ marginTop: 10 }}>Cargando pedidos...</Text>
+            </View>
+        );
+    }
     
     return (
         <View style={styles.container}>
@@ -169,9 +172,13 @@ const GestionPedidos = ({ navigation }) => {
                 data={filtrarPedidos()}
                 keyExtractor={(item) => item.id}
                 renderItem={renderItem}
+                ListEmptyComponent={() => (
+                    <Text style={{ textAlign: 'center', marginTop: 20 }}>
+                        No se encontraron pedidos.
+                    </Text>
+                )}
             />
 
-            
             <TouchableOpacity
                 style={styles.botonFlotante}
                 onPress={() => navigation.navigate('CrearPedido')}
@@ -183,4 +190,3 @@ const GestionPedidos = ({ navigation }) => {
 };
 
 export default GestionPedidos;
-

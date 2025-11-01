@@ -117,40 +117,40 @@ const GestionPlatillos = ({ navigation }) => {
     };
 
     const renderPlatillo = ({ item }) => (
-        <View style={styles.card}>
-            <View style={styles.filaPlatillo}>
-                <Image
-                    // Usamos la columna correcta: imagen_url
-                    source={{ uri: item.imagen_url || DEFAULT_IMAGE }} 
-                    style={styles.imagenPlatillo}
-                />
-                <View style={styles.infoPlatillo}>
-                    <Text style={styles.nombrePlatillo}>{item.nombre}</Text>
-                    <Text style={styles.precioPlatillo}>
-                        {/* Usamos la columna correcta: precio_usd */}
-                        Precio: {item.precio_usd ? `$${item.precio_usd.toFixed(2)}` : 'No disponible'} 
-                    </Text>
-                    <Text style={styles.descripcionPlatillo}>{item.descripcion}</Text>
-                </View>
-            </View>
-
-            <View style={styles.botonesFila}>
-                <TouchableOpacity
-                    style={[styles.botonAccion, styles.botonEditar]}
-                    onPress={() => navigation.navigate('EditarPlatillos', { id: item.id })}
-                >
-                    <Text style={styles.textoBoton}>Editar</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={[styles.botonAccion, styles.botonEliminar]}
-                    onPress={() => handleEliminar(item.id)}
-                >
-                    <Text style={styles.textoBoton}>Eliminar</Text>
-                </TouchableOpacity>
+    <View style={styles.card}>
+        <View style={styles.filaPlatillo}>
+            <Image
+                // Usa directamente el campo de la BD: imagen_url
+                source={{ uri: item.imagen_url || DEFAULT_IMAGE }} 
+                style={styles.imagenPlatillo}
+            />
+            <View style={styles.infoPlatillo}>
+                <Text style={styles.nombrePlatillo}>{item.nombre}</Text>
+                <Text style={styles.precioPlatillo}>
+                    {/* Usa directamente el campo de la BD: precio_usd */}
+                    Precio: {item.precio_usd ? `$${item.precio_usd.toFixed(2)}` : 'No disponible'} 
+                </Text>
+                <Text style={styles.descripcionPlatillo}>{item.descripcion}</Text>
             </View>
         </View>
-    );
+
+        <View style={styles.botonesFila}>
+            <TouchableOpacity
+                style={[styles.botonAccion, styles.botonEditar]}
+                onPress={() => navigation.navigate('EditarPlatillo', { id: item.id })}
+            >
+                <Text style={styles.textoBoton}>Editar</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+                style={[styles.botonAccion, styles.botonEliminar]}
+                onPress={() => handleEliminar(item.id)}
+            >
+                <Text style={styles.textoBoton}>Eliminar</Text>
+            </TouchableOpacity>
+        </View>
+    </View>
+);
 
     return (
         <SafeAreaView style={{ flex: 1 }}>

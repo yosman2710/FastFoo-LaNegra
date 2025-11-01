@@ -19,7 +19,7 @@ import { Picker } from '@react-native-picker/picker';
 // Importamos servicios de Supabase
 import { obtenerPlatilloPorId, actualizarPlatillo } from '../services/dishService.js'; 
 import { obtenerTasaDolar } from '../services/configService.js';
-import { supabase } from '../lib/supabase.js'; // Necesario para el Storage
+import { supabase } from '../utils/supabase.js'; // Necesario para el Storage
 
 import { styles } from '../styles/crearPlatillos.styles.js';
 

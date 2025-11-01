@@ -7,67 +7,80 @@ import {
     Modal,
     FlatList,
     Alert,
-    ActivityIndicator // Añadido para el estado de carga
+    ActivityIndicator
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-// ELIMINAMOS: import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Importamos servicios de Supabase
-import { actualizarPedido, registrarAbono } from '../services/orderServices.js'; // Usar actualizarPedido para items
+// Asegúrate de importar desde las rutas correctas
+import { 
+    actualizarPedido, 
+    registrarAbono, 
+    obtenerPedidoPorId 
+} from '../services/orderServices.js'; 
 
-import { obtenerTasaDolar } from '../services/configService.js';
-import { obtenerPlatillos } from '../services/dishService.js';
-import { styles } from '../styles/verDetallesPedidos.style.js';
+import { obtenerTasaDolar } from '../services/configService.js'; // Asumimos esta ruta
+import { obtenerPlatillos } from '../services/dishService.js'; // Asumimos esta ruta
+import { styles } from '../styles/verDetallesPedidos.style.js'; // Asumimos esta ruta
 
 const PedidoDetalle = ({ route, navigation }) => {
-    // Los datos del pedido vienen de GestionPedidos (ya sincronizado)
-    const { pedido } = route.params;
+    const pedidoId = route.params?.id; 
 
     const [menuDisponible, setMenuDisponible] = useState([]);
     const [tasa, setTasa] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     
-    // Inicialización del estado con los nombres de columna de la BD (snake_case)
-    const [pedidoActual, setPedidoActual] = useState({
-        ...pedido,
-        // Usamos los campos de la BD para la fuente de verdad (ej: total_usd)
-        pagado_usd: pedido.monto_abonado_usd ?? 0,
-        pagado_bs: pedido.monto_abonado_bs ?? 0,
-        // clientName/clientAddress es solo para la UI, usamos cliente_nombre de la BD
-    });
+    const [pedidoActual, setPedidoActual] = useState(null);
 
     const [modalVisible, setModalVisible] = useState(false);
     const [selectorVisible, setSelectorVisible] = useState(false);
     const [montoAbonar, setMontoAbonar] = useState('');
-    const [metodoPago, setMetodoPago] = useState('efectivo'); // Nuevo campo requerido para registrarAbono
+    const [metodoPago, setMetodoPago] = useState('efectivo');
     const [monedaAbono, setMonedaAbono] = useState('usd');
     const [platilloSeleccionado, setPlatilloSeleccionado] = useState(null);
 
     useEffect(() => {
         const cargarDatos = async () => {
+            if (!pedidoId) {
+                Alert.alert("Error", "ID de pedido no proporcionado.");
+                setIsLoading(false);
+                navigation.goBack();
+                return;
+            }
+            
             try {
-                // 1. Cargar Platillos desde Supabase
+                // *** 1. CARGA DEL PEDIDO FRESCO POR ID (Ya mapeado con precios) ***
+                const pedidoFresco = await obtenerPedidoPorId(pedidoId);
+                if (!pedidoFresco) throw new Error('Pedido no encontrado en la base de datos.');
+
+                setPedidoActual({
+                    ...pedidoFresco,
+                    monto_abonado_usd: pedidoFresco.monto_abonado_usd ?? 0,
+                    monto_abonado_bs: pedidoFresco.monto_abonado_bs ?? 0,
+                });
+                
+                // 2. Cargar Platillos y Tasa
                 const platillos = await obtenerPlatillos();
                 setMenuDisponible(platillos);
                 if (platillos.length > 0) setPlatilloSeleccionado(platillos[0].id);
 
-                // 2. Cargar Tasa de Dólar desde Supabase
                 const valorTasaString = await obtenerTasaDolar();
                 if (valorTasaString) setTasa(parseFloat(valorTasaString));
             } catch (error) {
                 console.error("Error al cargar datos iniciales:", error);
-                Alert.alert("Error", "No se pudieron cargar los datos de menú o la tasa.");
+                Alert.alert("Error", "No se pudieron cargar los datos iniciales.");
+                navigation.goBack();
             } finally {
                 setIsLoading(false);
             }
         };
         cargarDatos();
-    }, []);
+    }, [pedidoId]);
 
     // -------------------------------------------------------------
-    // FUNCIÓN CRUCIAL MIGRADA: Abonar
+    // FUNCIÓN: Abonar
     // -------------------------------------------------------------
     const handleAbonar = async () => {
+        // ... (Lógica de handleAbonar) ...
         const montoString = montoAbonar.trim().replace(',', '.');
         const monto = parseFloat(montoString);
         
@@ -77,19 +90,13 @@ const PedidoDetalle = ({ route, navigation }) => {
         }
 
         try {
-            // 1. Convertir el monto del abono a USD
             const montoAbonoUSD = monedaAbono === 'usd' 
                 ? monto 
                 : parseFloat((monto / tasa).toFixed(2));
 
-            // 2. Llamar al servicio de Supabase (registrarAbono)
             await registrarAbono(pedidoActual.id, montoAbonoUSD, metodoPago);
             
             Alert.alert('✅ Abono Registrado', 'El pago se ha registrado en la nube.');
-
-            // NOTA: Para obtener el estado actualizado, idealmente deberías recargar el pedido 
-            // o confiar en que el Realtime de la pantalla anterior lo actualizará. 
-            // Por simplicidad, navegaremos hacia atrás.
             navigation.goBack(); 
 
         } catch (error) {
@@ -101,30 +108,22 @@ const PedidoDetalle = ({ route, navigation }) => {
         }
     };
 
-    // La lógica de modificación de ítems (local) se mantiene igual, 
-    // pero los cambios deben ser guardados en la BD.
-    
     // -------------------------------------------------------------
-    // FUNCIÓN CRUCIAL MIGRADA: Guardar Cambios
+    // FUNCIÓN: Guardar Cambios de Items
     // -------------------------------------------------------------
     const guardarCambios = async () => {
-        // 1. Recalcular el total USD del pedido basado en los items actualizados
-        const { totalUsd } = calcularTotales();
+        const { totalUsd } = calcularTotales(); 
         
-        // 2. Preparar los datos para Supabase (usando snake_case)
         const camposActualizados = {
+            // Se asume que los items tienen precioUsd/precio_usd
             items: pedidoActual.items,
             total_usd: parseFloat(totalUsd),
-            // No actualizamos pagado_usd, pagado_bs, ni estado aquí. 
-            // Esos campos solo deben ser actualizados por registrarAbono 
-            // o por el botón 'Completar Pedido'.
         };
         
         try {
-            // Llamar al servicio de actualización
             await actualizarPedido(pedidoActual.id, camposActualizados);
             
-            Alert.alert('✅ Pedido actualizado', 'Los cambios de ítems han sido guardados en la nube.');
+            Alert.alert('✅ Pedido actualizado', 'Los cambios de ítems han sido guardados.');
             navigation.goBack();
         } catch (error) {
             Alert.alert('Error', 'No se pudo guardar los cambios del pedido.');
@@ -133,7 +132,7 @@ const PedidoDetalle = ({ route, navigation }) => {
     };
 
     // -------------------------------------------------------------
-    // Calcular Totales (Se mantiene la lógica de cálculo local)
+    // FUNCIÓN: Calcular Totales (Usando los campos correctos)
     // -------------------------------------------------------------
     const calcularTotales = () => {
         let totalUsd = 0;
@@ -141,15 +140,14 @@ const PedidoDetalle = ({ route, navigation }) => {
 
         pedidoActual.items.forEach(item => {
             const cantidad = item.cantidad || 0;
-            // Usamos precio_usd de la BD, mapeado a precioUsd. Si no está, lo calculamos.
-            const usd = item.precioUsd ?? (item.precio_usd) ?? 0; 
-            const bs = item.precioBs ?? (tasa ? usd * tasa : 0);
+            // **PUNTO CLAVE:** Accede al precio unitario mapeado o guardado
+            const usd = item.precioUsd ?? item.precio_usd ?? 0; 
+            const bs = tasa ? usd * tasa : 0;
             
             totalUsd += cantidad * usd;
             totalBs += cantidad * bs;
         });
 
-        // Usamos los campos de la BD para el abono
         const pagadoUsd = pedidoActual.monto_abonado_usd || 0; 
         const pagadoBs = pedidoActual.monto_abonado_bs || 0;
 
@@ -160,8 +158,8 @@ const PedidoDetalle = ({ route, navigation }) => {
         const cambioBs = pagadoBs > totalBs ? pagadoBs - totalBs : 0;
 
         return {
-            totalUsd: totalUsd.toFixed(2),
-            totalBs: totalBs.toFixed(2),
+            totalUsd: totalUsd, 
+            totalBs: totalBs,
             pagadoUsd: pagadoUsd.toFixed(2),
             pagadoBs: pagadoBs.toFixed(2),
             pendienteUsd: pendienteUsd.toFixed(2),
@@ -171,7 +169,7 @@ const PedidoDetalle = ({ route, navigation }) => {
         };
     };
 
-    // Lógica para añadir/modificar/eliminar platillos (se mantiene)
+    // Lógica para añadir/modificar/eliminar platillos 
     const modificarCantidad = (id, delta) => {
         const itemsActualizados = pedidoActual.items.map(item =>
             item.id === id
@@ -197,41 +195,57 @@ const PedidoDetalle = ({ route, navigation }) => {
                     ? { ...item, cantidad: item.cantidad + 1 }
                     : item
             )
-            : [...pedidoActual.items, { ...platillo, cantidad: 1, precioUsd: platillo.precio_usd, precioBs: platillo.precio_usd * tasa }]; // Aseguramos que tenga los precios correctos
+            : [...pedidoActual.items, { 
+                ...platillo, 
+                cantidad: 1, 
+                // Aseguramos el nombre correcto para guardado en BD
+                precio_usd: platillo.precio_usd, 
+                // Aseguramos el nombre correcto para la UI
+                precioUsd: platillo.precio_usd, 
+                precioBs: platillo.precio_usd * tasa 
+            }];
 
         setPedidoActual(prev => ({ ...prev, items: itemsActualizados }));
         setSelectorVisible(false);
     };
 
     // -------------------------------------------------------------
-    // Lógica de Renderizado
+    // RENDERIZADO
     // -------------------------------------------------------------
-    const resumen = calcularTotales();
+    const resumen = pedidoActual ? calcularTotales() : {};
 
-    const renderItem = ({ item }) => (
-        <View style={styles.item}>
-            <Text style={styles.itemNombre}>{item.nombre}</Text>
-            <Text>Cantidad: {item.cantidad}</Text>
-            {/* Usamos los campos de la BD o los calculados/mapeados */}
-            <Text>Precio: ${item.precioUsd?.toFixed(2) ?? item.precio_usd?.toFixed(2)} / Bs {item.precioBs?.toFixed(2) ?? item.total_bs?.toFixed(2)}</Text> 
-            {pedidoActual.estado !== 'completado' && (
-                <View style={styles.itemControles}>
-                    <TouchableOpacity onPress={() => modificarCantidad(item.id, 1)}>
-                        <Text style={styles.control}>➕</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => modificarCantidad(item.id, -1)}>
-                        <Text style={styles.control}>➖</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => eliminarPlatillo(item.id)}>
-                        <Text style={styles.control}>🗑️</Text>
-                    </TouchableOpacity>
-                </View>
-            )}
-        </View>
-    );
+    const renderItem = ({ item }) => {
+        const usd = item.precioUsd ?? item.precio_usd ?? 0;
+        const totalItemUsd = (item.cantidad * usd).toFixed(2);
+        const totalItemBs = tasa ? (item.cantidad * usd * tasa).toFixed(2) : 'N/A';
+        
+        return (
+            <View style={styles.item}>
+                <Text style={styles.itemNombre}>{item.nombre}</Text>
+                {/* PRECIO UNITARIO SIN ASTERISCOS */}
+                <Text>Precio Unitario: ${usd.toFixed(2)} / Bs {(usd * tasa).toFixed(2)}</Text>
+                <Text>Cantidad: {item.cantidad}</Text>
+                {/* TOTAL ITEM SIN ASTERISCOS */}
+                <Text>Total Item: ${totalItemUsd} / Bs {totalItemBs}</Text> 
+                {pedidoActual.estado !== 'completado' && (
+                    <View style={styles.itemControles}>
+                        <TouchableOpacity onPress={() => modificarCantidad(item.id, 1)}>
+                            <Text style={styles.control}>➕</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => modificarCantidad(item.id, -1)}>
+                            <Text style={styles.control}>➖</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => eliminarPlatillo(item.id)}>
+                            <Text style={styles.control}>🗑️</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+            </View>
+        );
+    };
     
-    // Si la tasa no se cargó, la aplicación no debería funcionar correctamente
-    if (isLoading || !tasa) {
+    // Loader 
+    if (isLoading || !tasa || !pedidoActual) {
         return (
             <View style={styles.container}>
                 <ActivityIndicator size="large" color="#000" />
@@ -240,23 +254,23 @@ const PedidoDetalle = ({ route, navigation }) => {
         );
     }
 
-
+    // El componente principal 
     return (
         <View style={styles.container}>
             <Text style={styles.header}>Pedido de {pedidoActual.clientName || pedidoActual.cliente_nombre}</Text>
             <Text style={styles.direccion}>{pedidoActual.clientAddress || pedidoActual.cliente_direccion}</Text>
-            {/* El estado es el campo de la BD (pendiente/abonado/completado) */}
             <Text style={styles.estado}>Estado: <Text style={styles.estadoValor}>{pedidoActual.estado}</Text></Text>
 
             <FlatList
                 data={pedidoActual.items}
-                keyExtractor={(item) => item.id}
+                keyExtractor={(item, index) => item.id + index}
                 renderItem={renderItem}
                 style={styles.lista}
             />
 
             <View style={styles.resumen}>
-                <Text style={styles.total}>Total: ${resumen.totalUsd} / Bs {resumen.totalBs}</Text>
+                {/* TOTAL SIN ASTERISCOS */}
+                <Text style={styles.total}>Total: ${resumen.totalUsd.toFixed(2)} / Bs {resumen.totalBs.toFixed(2)}</Text>
                 <Text style={styles.pagado}>Pagado: ${resumen.pagadoUsd} / Bs {resumen.pagadoBs}</Text>
                 {resumen.cambioUsd > 0 || resumen.cambioBs > 0 ? (
                     <Text style={{ color: 'green' }}>Cambio: ${resumen.cambioUsd} / Bs {resumen.cambioBs}</Text>
@@ -265,29 +279,28 @@ const PedidoDetalle = ({ route, navigation }) => {
                 )}
             </View>
 
+            {/* BOTÓN COMPLETAR PEDIDO */}
             {pedidoActual.estado !== 'completado' && (
                 <TouchableOpacity
                     style={styles.botonCompletar}
                     onPress={async () => {
-                        // Abona el monto pendiente para completar el pago de forma automática
                         const montoPendienteUSD = parseFloat(resumen.pendienteUsd);
                         
                         if (montoPendienteUSD > 0) {
                             await registrarAbono(pedidoActual.id, montoPendienteUSD, 'cierre_automatico');
-                            Alert.alert('✅ Pedido completado', 'El saldo pendiente ha sido saldado y el pedido completado.');
-                            navigation.goBack(); 
-                        } else {
-                            // Si el monto pendiente es 0, simplemente lo marcamos como completado si no lo está
+                            Alert.alert('✅ Pedido completado', 'El saldo pendiente ha sido saldado.');
+                        } else if (pedidoActual.estado !== 'completado') {
                             await actualizarPedido(pedidoActual.id, { estado: 'completado' });
                             Alert.alert('✅ Pedido completado', 'El pedido ha sido marcado como completado.');
-                            navigation.goBack();
                         }
+                        navigation.goBack(); 
                     }}
                 >
                     <Text style={styles.botonTexto}>Completar Pedido</Text>
                 </TouchableOpacity>
             )}
 
+            {/* BOTONES ABONAR Y AGREGAR */}
             {pedidoActual.estado !== 'completado' && (
                 <View style={styles.botonFila}>
                     <TouchableOpacity style={styles.botonAbonar} onPress={() => setModalVisible(true)}>
@@ -300,12 +313,12 @@ const PedidoDetalle = ({ route, navigation }) => {
                 </View>
             )}
             
-
+            {/* BOTÓN GUARDAR CAMBIOS */}
             <TouchableOpacity style={styles.botonGuardar} onPress={guardarCambios}>
                 <Text style={styles.botonTexto}>Guardar Cambios</Text>
             </TouchableOpacity>
 
-            {/* Modal Abonar */}
+            {/* MODALES */}
             <Modal visible={modalVisible} transparent animationType="fade">
                 <View style={styles.modalFondo}>
                     <View style={styles.modal}>
@@ -318,7 +331,6 @@ const PedidoDetalle = ({ route, navigation }) => {
                             <Picker.Item label="Dólares (USD)" value="usd" />
                             <Picker.Item label="Bolívares (Bs)" value="bs" />
                         </Picker>
-                        {/* Nuevo Picker para Método de Pago */}
                          <Picker
                             selectedValue={metodoPago}
                             onValueChange={(value) => setMetodoPago(value)}
@@ -347,7 +359,6 @@ const PedidoDetalle = ({ route, navigation }) => {
                 </View>
             </Modal>
 
-            {/* Modal Selector de Platillo (sin cambios) */}
             <Modal visible={selectorVisible} transparent animationType="fade">
                 <View style={styles.modalFondo}>
                     <View style={styles.modal}>
@@ -360,7 +371,7 @@ const PedidoDetalle = ({ route, navigation }) => {
                                 {menuDisponible.map(p => (
                                     <Picker.Item
                                         key={p.id}
-                                        label={`${p.nombre} - $${p.precio_usd?.toFixed(2)}`}
+                                        label={`${p.nombre} - $${p.precio_usd?.toFixed(2)}`} 
                                         value={p.id}
                                     />
                                 ))}
