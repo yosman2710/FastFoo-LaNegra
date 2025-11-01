@@ -13,40 +13,42 @@ import {
     Platform
 } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
-// ELIMINAMOS: import AsyncStorage from '@react-native-async-storage/async-storage'; 
 import { Picker } from '@react-native-picker/picker';
 
 // Importamos servicios de Supabase
 import { obtenerPlatilloPorId, actualizarPlatillo } from '../services/dishService.js'; 
 import { obtenerTasaDolar } from '../services/configService.js';
-import { supabase } from '../utils/supabase.js'; // Necesario para el Storage
+import { supabase } from '../utils/supabase.js'; 
 
 import { styles } from '../styles/crearPlatillos.styles.js';
 
-const BUCKET_NAME = 'imagenes-platillos'; // ¡Asegúrate de que este sea el nombre de tu Bucket!
-// Necesitarás definir tu DEFAULT_IMAGE o usar una que no requiera el resolveAssetSource aquí.
-// const DEFAULT_IMAGE = 'URL_DEFAULT_SI_NO_HAY_IMAGEN'; 
+const BUCKET_NAME = 'imagenes-platillos';
+const DEFAULT_IMAGE_LOCAL = require('../../assets/default-dish.png'); 
 
-// -----------------------------------------------------------------
+// ----------------------------------------------------------------
 // FUNCIÓN AUXILIAR: SUBIR IMAGEN A SUPABASE STORAGE
-// (Copiada de CrearPlatillo.js, idealmente debería estar en un util)
 // -----------------------------------------------------------------
 const uploadAndGetUrl = async (uri, fileName, contentType) => {
-    const response = await fetch(uri);
-    const blob = await response.blob();
-    const filePath = `${Date.now()}_${fileName}`;
-    
-    const { error: uploadError } = await supabase.storage
-        .from(BUCKET_NAME) 
-        .upload(filePath, blob, { contentType: contentType, upsert: false });
+    try {
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        const filePath = `${Date.now()}_${fileName}`;
+        
+        const { error: uploadError } = await supabase.storage
+            .from(BUCKET_NAME) 
+            .upload(filePath, blob, { contentType: contentType, upsert: false });
 
-    if (uploadError) throw new Error('Falló al subir la imagen al Storage.');
-    
-    const { data: publicUrlData } = supabase.storage
-        .from(BUCKET_NAME)
-        .getPublicUrl(filePath);
+        if (uploadError) throw uploadError;
+        
+        const { data: publicUrlData } = supabase.storage
+            .from(BUCKET_NAME)
+            .getPublicUrl(filePath);
 
-    return publicUrlData.publicUrl;
+        return publicUrlData.publicUrl;
+    } catch (e) {
+        console.error('Error en uploadAndGetUrl:', e);
+        throw new Error('Falló al subir la imagen al Storage.');
+    }
 };
 
 const EditarPlatillos = ({ route, navigation }) => {
@@ -54,42 +56,49 @@ const EditarPlatillos = ({ route, navigation }) => {
 
     const [platillo, setPlatillo] = useState(null);
     const [nombre, setNombre] = useState('');
-    const [monto, setMonto] = useState('');
+    // Usar '' para TextInput
+    const [monto, setMonto] = useState(''); 
     const [moneda, setMoneda] = useState('usd');
     const [descripcion, setDescripcion] = useState('');
-    const [imagenUri, setImagenUri] = useState(''); // URI para mostrar
-    const [imagenAsset, setImagenAsset] = useState(null); // Asset para subir si es nueva
-    const [tasa, setTasa] = useState(null);
+    const [imagenUri, setImagenUri] = useState(''); 
+    const [imagenAsset, setImagenAsset] = useState(null); 
+    // Usar 0 para la tasa si falla la carga
+    const [tasa, setTasa] = useState(null); 
     const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false); // Para el botón Guardar
 
     useEffect(() => {
         const cargarDatos = async () => {
             try {
-                // 1. Cargar Platillo desde Supabase
+                // 1. Cargar Platillo
                 const datos = await obtenerPlatilloPorId(id);
-                if (!datos) throw new Error('Platillo no encontrado');
+                if (!datos) throw new Error('Platillo no encontrado.');
                 
-                // 2. Cargar Tasa desde Supabase
+                // 2. Cargar Tasa (Asegurar que sea un número, si falla, null)
                 const tasaGuardadaString = await obtenerTasaDolar();
-                const tasaValor = parseFloat(tasaGuardadaString);
+                const tasaValor = Number(tasaGuardadaString) || null; // Null si no es un número válido
+
+                if (!tasaValor) {
+                    Alert.alert('Advertencia', 'No se pudo obtener la tasa de cambio. No se podrá guardar en Bs.');
+                }
 
                 setPlatillo(datos);
                 setNombre(datos.nombre);
                 setDescripcion(datos.descripcion || '');
                 setTasa(tasaValor);
-
-                // 3. Inicializar campos de precio y moneda (usando siempre precio_usd)
-                if (datos.precio_usd) {
+                
+                // 3. Inicializar campos
+                if (datos.precio_usd !== undefined && datos.precio_usd !== null) {
                     setMoneda('usd');
-                    setMonto(datos.precio_usd.toString());
+                    // Conversión segura a String
+                    setMonto(Number(datos.precio_usd).toFixed(2)); 
                 }
                 
-                // 4. Inicializar imagen
-                setImagenUri(datos.imagen_url || ''); // Usamos imagen_url de la DB
+                setImagenUri(datos.imagen_url || ''); 
                 
             } catch (error) {
                 console.error('Error al cargar datos:', error);
-                Alert.alert('Error', 'No se pudo cargar el platillo: ' + error.message);
+                Alert.alert('Error Fatal', 'No se pudo cargar el platillo. Verifique la conexión: ' + error.message);
                 navigation.goBack();
             } finally {
                 setIsLoading(false);
@@ -103,73 +112,95 @@ const EditarPlatillos = ({ route, navigation }) => {
         const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.6 });
         if (result.assets && result.assets.length > 0) {
             const asset = result.assets[0];
-            setImagenAsset(asset); // Marcar que hay un nuevo asset para subir
-            setImagenUri(asset.uri); // Mostrar la nueva imagen
+            setImagenAsset(asset); 
+            setImagenUri(asset.uri); 
         }
     };
 
     const handleGuardar = async () => {
-        const montoNum = parseFloat(monto);
+        setIsSaving(true);
+        const montoNum = Number(monto); // Usar Number() para conversión segura
         
-        if (!nombre.trim() || isNaN(montoNum) || montoNum <= 0 || !tasa) {
-            Alert.alert('Error', 'Nombre, precio válido y tasa de cambio son obligatorios');
+        // --- VALIDACIONES ESTRICTAS ---
+        if (!nombre.trim()) {
+            Alert.alert('Error', 'El nombre del platillo es obligatorio.');
+            setIsSaving(false);
+            return;
+        }
+        if (isNaN(montoNum) || montoNum <= 0) {
+            Alert.alert('Error', 'Debe ingresar un precio válido y positivo.');
+            setIsSaving(false);
+            return;
+        }
+        if (moneda === 'bs' && !tasa) {
+             Alert.alert('Error', 'No se pudo cargar la tasa de cambio. Guarde el precio en USD.');
+            setIsSaving(false);
             return;
         }
 
         // 1. Determinar el precio base en USD (único que guardaremos)
-        const precioUsd = moneda === 'usd' ? montoNum : parseFloat((montoNum / tasa).toFixed(2));
-        
+        let precioUsd;
+        if (moneda === 'usd') {
+            precioUsd = montoNum;
+        } else { // moneda === 'bs'
+            // Usamos || 1 para evitar división por cero, aunque ya validamos que 'tasa' exista.
+            precioUsd = parseFloat((montoNum / (tasa || 1)).toFixed(2)); 
+        }
+
         // 2. Subir nueva imagen si se seleccionó una
-        let imagenUrlGuardada = platillo.imagen_url; // Empezamos con la URL actual
+        let imagenUrlGuardada = platillo.imagen_url; 
         if (imagenAsset) {
             try {
-                // Sube la nueva imagen y obtiene la URL
                 imagenUrlGuardada = await uploadAndGetUrl(
                     imagenAsset.uri, 
-                    imagenAsset.fileName || 'imagen_platillo',
+                    imagenAsset.fileName || `imagen_${id}`,
                     imagenAsset.type
                 );
-                // NOTA: No eliminamos la imagen antigua por simplicidad.
             } catch (e) {
-                Alert.alert('Error', 'No se pudo subir la nueva imagen.');
-                return;
+                // Si falla la subida, avisamos pero permitimos guardar el resto de los datos
+                Alert.alert('Error', 'No se pudo subir la nueva imagen. Se guardarán los datos de texto.');
+                imagenUrlGuardada = platillo.imagen_url; 
             }
         }
         
         // 3. Preparar el objeto para la ACTUALIZACIÓN
         const platilloActualizado = {
-            nombre,
-            precio_usd: precioUsd, // Guardamos el precio en USD
-            descripcion,
-            imagen_url: imagenUrlGuardada, // Nueva o antigua URL
-            // No necesitamos 'precioBs' en la actualización
+            nombre: nombre.trim(),
+            precio_usd: precioUsd, 
+            descripcion: descripcion.trim(),
+            imagen_url: imagenUrlGuardada, 
+            // Podrías añadir aquí 'activo' si lo usas en el formulario
         };
 
         try {
             // 4. Actualizar el registro en la base de datos
-            // La función usa el ID (UUID de Supabase) para el 'eq'
             await actualizarPlatillo(id, platilloActualizado); 
             
-            Alert.alert('✅', 'Platillo actualizado exitosamente en la nube');
+            Alert.alert('✅ Éxito', 'Platillo actualizado exitosamente.');
             navigation.goBack();
         } catch (error) {
-            Alert.alert('Error', 'No se pudo actualizar el platillo');
+            Alert.alert('Error', 'Fallo en la conexión al actualizar el platillo.');
             console.error('Error al actualizar platillo:', error);
+        } finally {
+            setIsSaving(false);
         }
     };
 
     if (isLoading || !platillo) {
         return (
-            <View style={styles.container}>
-                <ActivityIndicator size="large" color="#000" />
+            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color="#007AFF" />
                 <Text style={{ marginTop: 10 }}>Cargando platillo...</Text>
             </View>
         );
     }
     
-    // Cálculo de precios en tiempo real para la UI
-    const precioUsdCalculado = moneda === 'usd' ? monto : (monto / tasa)?.toFixed(2) || '...';
-    const precioBsCalculado = moneda === 'bs' ? monto : (monto * tasa)?.toFixed(2) || '...';
+    // Cálculos de precios seguros (usando Number() y || 0 para evitar fallos de NaN)
+    const montoBase = Number(monto) || 0;
+    const tasaActual = Number(tasa) || 0;
+    
+    const precioUsdCalculado = moneda === 'usd' ? montoBase.toFixed(2) : (montoBase / (tasaActual || 1))?.toFixed(2) || '...';
+    const precioBsCalculado = moneda === 'bs' ? montoBase.toFixed(2) : (montoBase * tasaActual)?.toFixed(2) || '...';
 
 
     return (
@@ -185,18 +216,25 @@ const EditarPlatillos = ({ route, navigation }) => {
                     <TouchableOpacity
                         style={styles.botonGuardarArribaDerecha}
                         onPress={handleGuardar}
+                        disabled={isSaving}
                     >
-                        <Text style={styles.textoBotonArribaDerecha}>✔ Guardar</Text>
+                        <Text style={styles.textoBotonArribaDerecha}>
+                            {isSaving ? 'Guardando...' : '✔ Guardar'}
+                        </Text>
                     </TouchableOpacity>
 
                     {/* Mostrar Precios Calculados */}
                     <View style={styles.resumenPrecios}>
                         <Text style={styles.resumenTexto}>USD (Guardado): ${precioUsdCalculado}</Text>
                         <Text style={styles.resumenTexto}>Bs (Estimado): Bs {precioBsCalculado}</Text>
+                        {tasaActual === 0 && <Text style={{ color: 'red', marginTop: 5 }}>Tasa de cambio no disponible.</Text>}
                     </View>
                     
                     <Text style={styles.seccionTitulo}>Información del Platillo</Text>
 
+                    {/* ... (Resto de los inputs y picker) ... */}
+
+                    {/* Campo Nombre */}
                     <Text style={styles.label}>Nombre del Platillo</Text>
                     <TextInput
                         style={styles.input}
@@ -204,25 +242,29 @@ const EditarPlatillos = ({ route, navigation }) => {
                         onChangeText={setNombre}
                     />
                     
+                    {/* Picker Moneda */}
                     <Text style={styles.label}>Moneda del Precio</Text>
                     <Picker
                         selectedValue={moneda}
-                        onValueChange={(value) => setMoneda(value)}
+                        onValueChange={setMoneda}
                         style={styles.input}
+                        enabled={tasaActual !== 0} // Desactivar si no hay tasa para evitar errores
                     >
                         <Picker.Item label="Dólares (USD)" value="usd" />
                         <Picker.Item label="Bolívares (Bs)" value="bs" />
                     </Picker>
 
+                    {/* Campo Monto */}
                     <Text style={styles.label}>Monto en {moneda === 'usd' ? 'USD' : 'Bs'}</Text>
                     <TextInput
                         style={styles.input}
                         keyboardType="numeric"
                         value={monto}
-                        onChangeText={setMonto}
+                        onChangeText={(text) => setMonto(text.replace(/[^0-9.]/g, ''))} // Limpieza de input
                         placeholder={`Ej: ${moneda === 'usd' ? '4.50' : '180.00'}`}
                     />
 
+                    {/* Campo Descripción */}
                     <Text style={styles.label}>Descripción</Text>
                     <TextInput
                         style={[styles.input, { height: 80 }]}
@@ -230,16 +272,24 @@ const EditarPlatillos = ({ route, navigation }) => {
                         value={descripcion}
                         onChangeText={setDescripcion}
                     />
-
+                    
+                    {/* Sección Imagen */}
                     <Text style={styles.label}>Imagen del Platillo</Text>
                     <TouchableOpacity style={styles.imageContainer} onPress={seleccionarImagen}>
                         {imagenUri ? (
-                            <Image source={{ uri: imagenUri }} style={{ width: '100%', height: '100%', borderRadius: 10 }} />
+                            <Image 
+                                source={{ uri: imagenUri }} 
+                                style={{ width: '100%', height: '100%', borderRadius: 10 }} 
+                            />
                         ) : (
-                            // Muestra un ícono si no hay imagen
-                            <Text style={styles.imageText}>Toca para seleccionar imagen</Text>
+                            <Image 
+                                source={DEFAULT_IMAGE_LOCAL} 
+                                style={{ width: '100%', height: '100%', borderRadius: 10 }} 
+                                resizeMode="cover"
+                            />
                         )}
                     </TouchableOpacity>
+                    
                 </ScrollView>
             </KeyboardAvoidingView>
         </SafeAreaView>

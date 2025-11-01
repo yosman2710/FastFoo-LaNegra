@@ -126,3 +126,35 @@ export const buscarPlatilloPorNombre = async (nombre) => {
 
     return data;
 };
+
+export const obtenerPlatilloPorId = async (id) => {
+    try {
+        const { data, error } = await supabase
+            .from(PLATILLOS_TABLE)
+            .select('*')
+            .eq('id', id) // Condición: donde el ID coincida
+            .single(); // Esperamos un único registro
+
+        if (error) throw error;
+        
+        if (!data) {
+            // Si no hay error de Supabase pero no se encuentra data (aunque single() debería manejar esto)
+            throw new Error('Platillo no encontrado.'); 
+        }
+
+        // Mapeo: Aseguramos el formato camelCase para la UI
+        return {
+            ...data,
+            id: data.id, 
+            nombre: data.nombre,
+            descripcion: data.descripcion,
+            precioUsd: data.precio_usd,
+            imagen: data.imagen_url,
+            // 'activo' ya vendrá como booleano
+        };
+
+    } catch (error) {
+        console.error('Error al obtener platillo por ID:', error);
+        throw new Error(error.message || 'No se pudo cargar el platillo.');
+    }
+};
