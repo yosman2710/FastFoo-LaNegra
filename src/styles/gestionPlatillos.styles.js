@@ -6,6 +6,15 @@ export const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#ffe6ea'
   },
+  titulo: {
+        fontSize: 26,
+        fontWeight: 'bold',
+        marginTop: 30,
+        marginBottom: 10,
+        textAlign: 'center',
+        color: '#333',
+        letterSpacing: 0.5,
+    },
   card: {
   padding: 10,
   borderBottomWidth: 1,

@@ -7,26 +7,25 @@ import {
     TextInput,
     TouchableOpacity,
     Alert,
-    ActivityIndicator
+    ActivityIndicator,
+    SafeAreaView // 🛑 Ya importado
 } from 'react-native';
+// 🛑 Importamos iconos (si usas Expo, puedes usar @expo/vector-icons, sino, instala react-native-vector-icons)
+// Para simplificar, mantendré los emojis en el texto como lo tenías, pero el diseño mejora.
 
 // Importa tus servicios y utilidades
 import { supabase } from '../utils/supabase.js'; 
 import { obtenerPedidos, eliminarPedido } from '../services/orderServices.js'; 
-import { styles } from '../styles/gestionPedidos.style.js'; // Asegúrate de que esta ruta sea correcta
+import { styles } from '../styles/gestionPedidos.style.js'; 
 
 const GestionPedidos = ({ navigation }) => {
     const [pedidos, setPedidos] = useState([]);
     const [busqueda, setBusqueda] = useState('');
     const [isLoading, setIsLoading] = useState(true);
 
-    // FUNCIÓN CENTRAL: Carga de pedidos con useCallback para eficiencia
     const cargarPedidos = useCallback(async () => {
         try {
             const data = await obtenerPedidos(); 
-            
-            // Mapeo: Aseguramos el estado, y aquí TOTAL y PAGADO ya deberían ser 0 si son null 
-            // gracias al servicio obtenerPedidos.
             const actualizados = data.map(p => ({
                 ...p,
                 estado: p.estado || 'pendiente' 
@@ -43,7 +42,6 @@ const GestionPedidos = ({ navigation }) => {
         }
     }, []); 
 
-    // 1. RECUPERAR DATOS AL ENFOCAR (Recarga al volver de crear/editar)
     useFocusEffect(
         useCallback(() => {
             cargarPedidos();
@@ -51,7 +49,6 @@ const GestionPedidos = ({ navigation }) => {
         }, [cargarPedidos])
     );
     
-    // 2. MANTENER TIEMPO REAL (Realtime para cambios externos)
     useEffect(() => {
         const subscription = supabase
             .channel('pedidos-channel')
@@ -69,7 +66,6 @@ const GestionPedidos = ({ navigation }) => {
         };
     }, [cargarPedidos]); 
 
-    // Función de filtrado
     const filtrarPedidos = () => {
         return pedidos.filter(p =>
             (p.clientName?.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -78,7 +74,8 @@ const GestionPedidos = ({ navigation }) => {
         );
     };
 
-    // Función para eliminar
+
+    // Función para eliminar con actualización optimista
     const handleEliminarPedido = async (id) => {
         Alert.alert('¿Eliminar?', '¿Deseas eliminar este pedido de la nube?', [
             { text: 'Cancelar', style: 'cancel' },
@@ -87,9 +84,18 @@ const GestionPedidos = ({ navigation }) => {
                 style: 'destructive',
                 onPress: async () => {
                     try {
+                        // 1. Ejecutar la eliminación en Supabase
                         await eliminarPedido(id); 
-                        Alert.alert('✅ Éxito', 'Pedido eliminado. Sincronizando...');
+                        
+                        // 2. 🛑 ACTUALIZACIÓN INMEDIATA DEL ESTADO LOCAL
+                        setPedidos(currentPedidos => 
+                            currentPedidos.filter(p => p.id !== id)
+                        );
+                        
+                        Alert.alert('✅ Éxito', 'Pedido eliminado correctamente.');
                     } catch (error) {
+                        // Si falla, podrías volver a cargar la lista para asegurar la consistencia:
+                        cargarPedidos(); 
                         console.error('Error al eliminar pedido:', error);
                         Alert.alert('Error', 'No se pudo eliminar el pedido de la nube.');
                     }
@@ -98,94 +104,135 @@ const GestionPedidos = ({ navigation }) => {
         ]);
     };
 
-    // Función para color de estado
+
     const getEstadoColor = (estado) => {
         switch (estado) {
-            case 'pendiente': return '#e53935';
-            case 'abonado': return '#fb8c00';
-            case 'completado': return '#43a047';
-            case 'cancelado': return '#757575';
+            case 'pendiente': return '#e53935'; // Rojo (Tu color de botón Eliminar es similar)
+            case 'abonado': return '#fb8c00'; // Naranja
+            case 'completado': return '#43a047'; // Verde
+            case 'cancelado': return '#757575'; // Gris
             default: return '#000';
         }
     };
 
     // FUNCIÓN RENDER: Muestra cada ítem de pedido
     const renderItem = ({ item }) => {
-        const totalUsd = Number(item.totalUsd ?? item.total_usd ?? 0).toFixed(2);
-        const pagadoUsd = Number(item.pagadoUsd ?? item.monto_abonado_usd ?? 0).toFixed(2);
+        // Usamos la lógica de deuda resaltada que te pasé previamente
+        const totalUsd = Number(item.totalUsd ?? item.total_usd ?? 0);
+        const pagadoUsd = Number(item.pagadoUsd ?? item.monto_abonado_usd ?? 0);
+        const saldoPendiente = (totalUsd - pagadoUsd).toFixed(2);
+        const totalUsdFormatted = totalUsd.toFixed(2);
+        const pagadoUsdFormatted = pagadoUsd.toFixed(2);
+        
+        // Función para navegar al detalle
+        const handleVerDetalle = () => {
+            navigation.navigate('DetallePedido', { id: item.id });
+        };
 
         return (
-            <View style={styles.card}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={styles.id}>#{item.id.substring(0, 8)}...</Text> 
+            // 🛑 CAMBIO CLAVE: La tarjeta entera es el botón de "Ver"
+            <TouchableOpacity 
+                style={styles.card} 
+                onPress={handleVerDetalle}
+                activeOpacity={0.7} // Retroalimentación visual al presionar
+            > 
+                
+                {/* FILA 1: Nombre del Cliente y Estado (Header) */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 5 }}>
+                    <Text style={styles.nombre}>
+                        {item.clientName || item.cliente_nombre}
+                    </Text>
                     <Text style={[styles.estadoBadge, { backgroundColor: getEstadoColor(item.estado) }]}>
                         {item.estado.toUpperCase()}
                     </Text>
                 </View>
 
-                <Text style={styles.nombre}>👤 {item.clientName || item.cliente_nombre}</Text>
-                {/* SIN ASTERISCOS y valores numéricos garantizados */}
-                <Text style={styles.total}>💰 Total: ${totalUsd}</Text>
-                <Text style={styles.pagado}>🧾 Pagado: ${pagadoUsd}</Text>
-                <Text style={styles.fecha}>📅 {new Date(item.created_at || item.createdAt).toLocaleDateString()}</Text>
+                {/* FILA 2: Total y Fecha */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <View style={styles.infoContainer}>
+                        <Text style={styles.total}>💰Total: ${totalUsdFormatted}</Text>
+                    </View>
+                    <View style={styles.infoContainer}>
+                        <Text style={styles.fecha}>
+                            📅{new Date(item.created_at || item.createdAt).toLocaleDateString()}
+                        </Text>
+                    </View>
+                </View>
+                
+                {/* FILA 3: Monto Pagado */}
+                <View style={styles.infoContainer}>
+                    <Text style={styles.pagado}>Pagado: ${pagadoUsdFormatted}</Text>
+                </View>
 
+                {/* NUEVA FILA: Deuda Pendiente resaltada (si existe) */}
+                {(saldoPendiente > 0) && (
+                    <Text style={styles.deudaPendiente}>
+                        Saldo Pendiente: ${saldoPendiente}
+                    </Text>
+                )}
+                
+                {/* FILA 4: Acciones (Solo queda Eliminar) */}
                 <View style={styles.acciones}>
-                    <TouchableOpacity
-                        style={styles.botonVer}
-                        onPress={() => navigation.navigate('DetallePedido', { id: item.id })}
-                    >
-                        <Text style={styles.textoBoton}>Ver</Text>
-                    </TouchableOpacity>
+                    {/* Dejamos un espacio vacío para alinear el botón Eliminar a la derecha */}
+                    <View style={{ flex: 1 }} /> 
 
                     <TouchableOpacity
                         style={styles.botonEliminar}
-                        onPress={() => handleEliminarPedido(item.id)}
+                        onPress={(e) => {
+                            e.stopPropagation(); // Evita que la tarjeta se presione
+                            handleEliminarPedido(item.id);
+                        }}
                     >
                         <Text style={styles.textoBoton}>Eliminar</Text>
                     </TouchableOpacity>
                 </View>
-            </View>
+            </TouchableOpacity>
         );
     };
     
     if (isLoading) {
         return (
-            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator size="large" color="#000" />
-                <Text style={{ marginTop: 10 }}>Cargando pedidos...</Text>
-            </View>
+            // 🛑 Usamos SafeAreaView para el estado de carga también
+            <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color="#c21c1c" />
+                <Text style={{ marginTop: 10, color: '#333' }}>Cargando pedidos...</Text>
+            </SafeAreaView>
         );
     }
     
     return (
-        <View style={styles.container}>
+        // 🛑 Implementación final de SafeAreaView como contenedor principal
+        <SafeAreaView style={styles.container}>
             <Text style={styles.titulo}>Mis Pedidos</Text>
 
             <TextInput
                 style={styles.input}
-                placeholder="Buscar pedidos..."
+                placeholder="Buscar pedidos por cliente o ID..."
                 value={busqueda}
                 onChangeText={setBusqueda}
+                placeholderTextColor="#777"
             />
 
             <FlatList
                 data={filtrarPedidos()}
                 keyExtractor={(item) => item.id}
                 renderItem={renderItem}
+                contentContainerStyle={{ paddingBottom: 100 }} // Espacio para el botón flotante
                 ListEmptyComponent={() => (
-                    <Text style={{ textAlign: 'center', marginTop: 20 }}>
+                    <Text style={{ textAlign: 'center', marginTop: 30, color: '#777' }}>
                         No se encontraron pedidos.
                     </Text>
                 )}
             />
 
+            {/* Botón Flotante para crear */}
             <TouchableOpacity
                 style={styles.botonFlotante}
                 onPress={() => navigation.navigate('CrearPedido')}
             >
                 <Text style={styles.iconoFlotante}>＋</Text>
             </TouchableOpacity>
-        </View>
+        </SafeAreaView>
     );
 };
 

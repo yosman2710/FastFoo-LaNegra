@@ -41,7 +41,6 @@ export const guardarPedido = async (datosPedido) => {
             .insert([
                 {
                     cliente_nombre: datosPedido.cliente_nombre,
-                    cliente_direccion: datosPedido.cliente_direccion || null,
                     items: datosPedido.items, // JSONB: Se espera que cada item tenga 'precio_usd'
                     total_usd: totalUSD,
                     total_bs: totalBS,
@@ -79,7 +78,6 @@ export const obtenerPedidos = async () => {
         ...pedido,
         id: pedido.id, 
         clientName: pedido.cliente_nombre, 
-        clientAddress: pedido.cliente_direccion, 
         totalUsd: pedido.total_usd || 0, 
         pagadoUsd: pedido.monto_abonado_usd || 0, 
         pagadoBs: pedido.monto_abonado_bs || 0,
@@ -253,7 +251,6 @@ export const obtenerPedidoPorId = async (id) => {
             ...pedidoData,
             items: itemsMapeados, 
             clientName: pedidoData.cliente_nombre,
-            clientAddress: pedidoData.cliente_direccion,
             totalUsd: pedidoData.total_usd,
             pagadoUsd: pedidoData.monto_abonado_usd,
             pagadoBs: pedidoData.monto_abonado_bs,

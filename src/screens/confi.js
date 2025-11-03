@@ -57,7 +57,7 @@ const Configuracion = () => {
 
     return (
         <View style={styles.container}>
-            <Text style={styles.label}>Tasa actual del dólar (Bs):</Text>
+            <Text style={styles.titulo}>Tasa actual del dólar (Bs):</Text>
             <TextInput
                 style={styles.input}
                 keyboardType="numeric"
@@ -74,7 +74,15 @@ const Configuracion = () => {
 
 const styles = StyleSheet.create({
     container: { padding: 40, backgroundColor: '#ffe6ea', flex: 1 },
-    label: { fontSize: 16, marginBottom: 20 },
+    titulo: {
+        fontSize: 26,
+        fontWeight: 'bold',
+        marginTop: 30,
+        marginBottom: 10,
+        textAlign: 'center',
+        color: '#333',
+        letterSpacing: 0.5,
+    },
     input: {
         backgroundColor: '#fff',
         padding: 12,

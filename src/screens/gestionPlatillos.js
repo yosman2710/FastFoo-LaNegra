@@ -148,7 +148,7 @@ const GestionPlatillos = ({ navigation }) => {
                 <View style={styles.infoPlatillo}>
                     <Text style={styles.nombrePlatillo} numberOfLines={1}>{item.nombre}</Text>
                     <Text style={styles.precioPlatillo}>
-                        Precio: **{item.precio_usd ? `$${Number(item.precio_usd).toFixed(2)}` : 'N/A'}**
+                        Precio: {item.precio_usd ? `$${Number(item.precio_usd).toFixed(2)}` : 'N/A'}
                     </Text>
                     <Text style={styles.descripcionPlatillo} numberOfLines={2}>
                         {item.descripcion}

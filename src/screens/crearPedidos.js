@@ -5,23 +5,24 @@ import {
     FlatList,
     TextInput,
     TouchableOpacity,
-    Alert
+    Alert,
+    SafeAreaView // 🛑 Añadido para mejor UI/UX
 } from 'react-native';
-// ELIMINAMOS: import AsyncStorage from '@react-native-async-storage/async-storage'; 
 
 // Importamos las funciones de servicio actualizadas:
-import { obtenerPlatillos } from '../services/dishService.js'; // Usamos el nombre correcto
-import { guardarPedido } from '../services/orderServices.js';     // Usamos el nombre correcto
-import { obtenerTasaDolar } from '../services/configService.js';    // Nuevo servicio para la tasa
-
+import { obtenerPlatillos } from '../services/dishService.js'; 
+import { guardarPedido } from '../services/orderServices.js'; 
+import { obtenerTasaDolar } from '../services/configService.js'; 
 import { styles } from '../styles/crearPedidos.style.js';
 
 const CrearPedido = ({ navigation }) => {
     const [platillos, setPlatillos] = useState([]);
     const [cantidades, setCantidades] = useState({});
     const [cliente, setCliente] = useState('');
-    const [direccion, setDireccion] = useState('');
-    const [tasa, setTasa] = useState(null); // Tasa obtenida de la nube
+    // 🛑 NUEVO: Estado para el término de búsqueda de platillos
+    const [busqueda, setBusqueda] = useState(''); 
+    // 🛑 ELIMINADO: Ya no se usa el estado de dirección
+    const [tasa, setTasa] = useState(null); 
 
     useEffect(() => {
         const cargarDatos = async () => {
@@ -54,15 +55,14 @@ const CrearPedido = ({ navigation }) => {
         setCantidades(prev => ({ ...prev, [id]: Math.max(prev[id] - 1, 0) }));
     };
 
-    // FUNCIÓN CLAVE: Ahora el cálculo se basa en precio_usd y la tasa actual
     const calcularTotal = () => {
         if (tasa === null) return { usd: '0.00', bs: '0.00' };
 
         let totalUsd = 0;
         
+        // Iterar sobre la lista COMPLETA de platillos
         platillos.forEach(p => {
             const cantidad = cantidades[p.id] || 0;
-            // Usamos la columna precio_usd (precio base) que viene de Supabase
             const usd = p.precio_usd || 0; 
             totalUsd += cantidad * usd;
         });
@@ -76,13 +76,12 @@ const CrearPedido = ({ navigation }) => {
     };
 
     const confirmarPedido = async () => {
-        // 1. Preparar la lista de ítems para JSONB (solo con los datos que necesitamos)
+        // 1. Preparar la lista de ítems para JSONB
         const items = platillos
             .filter(p => cantidades[p.id] > 0)
             .map(p => ({
                 id: p.id,
                 nombre: p.nombre,
-                // Incluimos el precio en USD al momento de la compra
                 precio_unitario_usd: p.precio_usd, 
                 cantidad: cantidades[p.id]
             }));
@@ -100,27 +99,19 @@ const CrearPedido = ({ navigation }) => {
         const total = calcularTotal();
 
         // 2. Preparar el objeto para la función guardarPedido
-        // Ya no necesitamos calcular totalBs, status, etc., en el cliente, 
-        // ya que la función del servicio lo hace
         const nuevoPedido = {
             cliente_nombre: cliente,
-            cliente_direccion: direccion,
-            items: items, // Lista de ítems con cantidades y precios USD
+            items: items, 
             total_usd: parseFloat(total.usd),
         };
 
         try {
-            // 3. Guardar en la nube. La función 'guardarPedido' se encarga de:
-            //    - Obtener la tasa de la nube.
-            //    - Calcular total_bs.
-            //    - Insertar en la tabla 'pedidos'.
             await guardarPedido(nuevoPedido);
             
             Alert.alert('✅ Éxito', 'Pedido creado y guardado en la nube exitosamente');
             
             // Limpiar y volver
             setCliente('');
-            setDireccion('');
             setCantidades({});
             navigation.goBack();
             
@@ -128,6 +119,17 @@ const CrearPedido = ({ navigation }) => {
             console.error('Error al guardar pedido:', error);
             Alert.alert('Error', 'Hubo un problema al guardar el pedido en Supabase.');
         }
+    };
+
+    // 🛑 NUEVO: Función para filtrar platillos localmente por nombre
+    const platillosFiltrados = () => {
+        if (!busqueda.trim()) {
+            return platillos;
+        }
+        const lowerCaseBusqueda = busqueda.toLowerCase().trim();
+        return platillos.filter(p => 
+            p.nombre?.toLowerCase().includes(lowerCaseBusqueda)
+        );
     };
 
     const renderItem = ({ item }) => {
@@ -138,13 +140,13 @@ const CrearPedido = ({ navigation }) => {
             <View style={styles.item}>
                 <Text style={styles.nombre}>{item.nombre}</Text>
                 <Text style={styles.precio}>
-                    ${item.precio_usd?.toFixed(2)} / Bs {precioBsCalculado}
+                    ${Number(item.precio_usd)?.toFixed(2)} / Bs {precioBsCalculado}
                 </Text>
                 <View style={styles.controles}>
                     <TouchableOpacity onPress={() => decrementar(item.id)} style={styles.botonControl}>
                         <Text style={styles.controlTexto}>−</Text>
                     </TouchableOpacity>
-                    <Text style={styles.cantidad}>{cantidades[item.id]}</Text>
+                    <Text style={styles.cantidad}>{cantidades[item.id] || 0}</Text>
                     <TouchableOpacity onPress={() => incrementar(item.id)} style={styles.botonControl}>
                         <Text style={styles.controlTexto}>+</Text>
                     </TouchableOpacity>
@@ -154,42 +156,51 @@ const CrearPedido = ({ navigation }) => {
     };
 
     const total = calcularTotal();
+    const listaFinal = platillosFiltrados(); // La lista que se renderiza
 
     return (
-        <View style={styles.container}>
-            <Text style={styles.titulo}>Crear Pedido</Text>
+        <SafeAreaView style={{ flex: 1 }}>
+            <View style={styles.container}>
+                <Text style={styles.titulo}>Crear Pedido</Text>
 
-            <TextInput
-                style={styles.input}
-                placeholder="Nombre o referencia del cliente"
-                value={cliente}
-                onChangeText={setCliente}
-            />
+                <TextInput
+                    style={styles.input}
+                    placeholder="Nombre o referencia del cliente"
+                    value={cliente}
+                    onChangeText={setCliente}
+                />
+                
+                {/* 🛑 NUEVO: Campo de búsqueda de platillos */}
+                <TextInput
+                    style={styles.input}
+                    placeholder="🔍 Buscar platillos..."
+                    value={busqueda}
+                    onChangeText={setBusqueda}
+                />
 
-            <TextInput
-                style={styles.input}
-                placeholder="Dirección del cliente (Opcional)"
-                value={direccion}
-                onChangeText={setDireccion}
-            />
+                <FlatList
+                    style={styles.listaPlatillos}
+                    // 🛑 CAMBIO: Usamos la lista filtrada
+                    data={listaFinal} 
+                    keyExtractor={(item) => item.id} 
+                    renderItem={renderItem}
+                    ListEmptyComponent={() => (
+                        <Text style={{ textAlign: 'center', marginTop: 20, color: '#777' }}>
+                            {busqueda.trim() ? `No se encontró "${busqueda}".` : 'No hay platillos disponibles.'}
+                        </Text>
+                    )}
+                />
 
-            <FlatList
-                style={styles.listaPlatillos}
-                data={platillos}
-                // Usamos el ID de Supabase, que ya es string (UUID)
-                keyExtractor={(item) => item.id} 
-                renderItem={renderItem}
-            />
+                <View style={styles.resumen}>
+                    <Text style={styles.resumenTitulo}>Resumen del Pedido</Text>
+                    <Text style={styles.total}>Total: ${total.usd} / Bs {total.bs}</Text>
+                </View>
 
-            <View style={styles.resumen}>
-                <Text style={styles.resumenTitulo}>Resumen del Pedido</Text>
-                <Text style={styles.total}>Total: ${total.usd} / Bs {total.bs}</Text>
+                <TouchableOpacity style={styles.botonConfirmar} onPress={confirmarPedido}>
+                    <Text style={styles.textoBoton}>Confirmar Pedido</Text>
+                </TouchableOpacity>
             </View>
-
-            <TouchableOpacity style={styles.botonConfirmar} onPress={confirmarPedido}>
-                <Text style={styles.textoBoton}>Confirmar Pedido</Text>
-            </TouchableOpacity>
-        </View>
+        </SafeAreaView>
     );
 };
 

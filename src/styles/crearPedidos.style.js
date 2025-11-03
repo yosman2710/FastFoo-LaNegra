@@ -83,7 +83,7 @@ export const styles = StyleSheet.create({
     color: '#555'
   },
   botonConfirmar: {
-    marginTop: 20,
+    marginTop: 10,
     backgroundColor: '#4CAF50',
     paddingVertical: 14,
     borderRadius: 8,
