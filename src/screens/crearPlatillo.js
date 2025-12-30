@@ -7,12 +7,14 @@ import {
     Image,
     Alert,
     ScrollView,
-    SafeAreaView,
     KeyboardAvoidingView,
     Platform,
     ActivityIndicator
 } from 'react-native';
-import { launchImageLibrary } from 'react-native-image-picker';
+import { SafeAreaView } from 'react-native-safe-area-context';
+// 🛑 IMPORTACIONES DE EXPO (NUEVAS)
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { Picker } from '@react-native-picker/picker';
 
 import { insertarPlatillo } from '../services/dishService.js';
@@ -25,34 +27,40 @@ const DEFAULT_IMAGE_URI = Image.resolveAssetSource(DEFAULT_IMAGE_LOCAL).uri;
 const BUCKET_NAME = 'imagenes-platillos';
 
 // -----------------------------------------------------------------
-// FUNCIÓN AUXILIAR MEJORADA: SUBIR IMAGEN DESDE PICKER
+// FUNCIÓN AUXILIAR CORREGIDA: SUBIR IMAGEN USANDO BASE64 Y FileSystem
 // -----------------------------------------------------------------
-const uploadAndGetUrl = async (uri, fileName) => {
-    // Convierte archivo local a Blob usando fetch (compatible React Native/Expo)
-    let blob;
-    try {
-        const response = await fetch(uri);
-        blob = await response.blob();
-    } catch (error) {
-        console.error('Error al convertir la imagen a blob:', error);
-        throw new Error('No se pudo procesar la imagen seleccionada.');
-    }
+// 🛑 Ya no necesitamos el 'fileName' en los argumentos, el nombre se genera internamente.
+const uploadAndGetUrl = async (uri) => {
+    // 1. Leer el archivo como Base64 usando Expo FileSystem
+    const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+    });
 
-    // Sube el Blob al bucket público de Supabase
-    const filePath = `${Date.now()}_${fileName}`;
+    // 2. Establecer el tipo MIME y extensión (puedes intentar extraerlo del URI si es complejo)
+    // Para simplificar y dado que el Base64 lo maneja, usamos un estándar.
+    const mimeType = 'image/jpeg';
+    const fileExt = 'jpeg';
+
+    // 3. Crear el nombre de archivo único para Supabase
+    const filePath = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+
+    // 4. Subir la cadena Base64 a Supabase Storage
     const { error: uploadError } = await supabase.storage
         .from(BUCKET_NAME)
-        .upload(filePath, blob, {
-            contentType: 'image/jpeg', // O ajusta según el tipo de archivo
+        // Usamos la cadena Base64
+        .upload(filePath, base64, {
+            contentType: mimeType,
             upsert: false,
+            // 🛑 CRÍTICO: Indica a Supabase que el contenido es Base64
+            decode: true,
         });
 
     if (uploadError) {
         console.error('Error Detallado de Subida a Supabase:', uploadError);
-        throw new Error('Fallo en la subida a Supabase. Revisa las políticas o el log.');
+        throw new Error(`Fallo de Supabase: ${uploadError.message}. Verifica las políticas RLS o el log.`);
     }
 
-    // Obtén la URL pública de acceso
+    // 5. Obtener la URL pública de acceso
     const { data: publicUrlData } = supabase.storage
         .from(BUCKET_NAME)
         .getPublicUrl(filePath);
@@ -92,8 +100,23 @@ const CrearPlatillo = ({ navigation }) => {
     }, []);
 
     const seleccionarImagen = async () => {
-        const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.6 });
-        if (result.assets && result.assets.length > 0) {
+        // 1. Solicitar permiso de la galería (necesario en iOS/Android)
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+        if (status !== 'granted') {
+            Alert.alert('Permiso Denegado', 'Necesitamos permiso para acceder a tu galería y subir la imagen.');
+            return;
+        }
+
+        // 2. Iniciar la librería de imágenes con Expo Image Picker
+        let result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images, // Solo imágenes
+            allowsEditing: false,
+            quality: 0.6,
+        });
+
+        // 3. Procesar resultado
+        if (!result.canceled && result.assets && result.assets.length > 0) {
             const asset = result.assets[0];
             setImagenAsset(asset);
             setImagenUri(asset.uri);
@@ -125,10 +148,8 @@ const CrearPlatillo = ({ navigation }) => {
         let imagenUrlGuardada = null;
         if (imagenAsset) {
             try {
-                imagenUrlGuardada = await uploadAndGetUrl(
-                    imagenAsset.uri,
-                    imagenAsset.fileName || `imagen_${Date.now()}.jpg`
-                );
+                // 🛑 Llamamos a la nueva función que usa Base64
+                imagenUrlGuardada = await uploadAndGetUrl(imagenAsset.uri);
             } catch (e) {
                 Alert.alert('Error de Subida', e.message);
                 setIsSaving(false);

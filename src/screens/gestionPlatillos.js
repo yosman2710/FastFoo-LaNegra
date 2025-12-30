@@ -8,19 +8,19 @@ import {
     Alert,
     Image,
     TouchableOpacity,
-    SafeAreaView,
     KeyboardAvoidingView,
     Platform,
     ActivityIndicator // Añadimos indicador de carga
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Importamos el cliente Supabase para la función Realtime
-import { supabase } from '../utils/supabase.js'; 
+import { supabase } from '../utils/supabase.js';
 import {
     obtenerPlatillos,
     buscarPlatilloPorNombre,
     eliminarPlatillo
-} from '../services/dishService.js'; 
+} from '../services/dishService.js';
 
 import { styles } from '../styles/gestionPlatillos.styles.js';
 
@@ -36,13 +36,13 @@ const GestionPlatillos = ({ navigation }) => {
         try {
             let data;
             const searchTerm = term.trim();
-            
+
             if (searchTerm === '') {
-                data = await obtenerPlatillos(); 
+                data = await obtenerPlatillos();
             } else {
-                data = await buscarPlatilloPorNombre(searchTerm); 
+                data = await buscarPlatilloPorNombre(searchTerm);
             }
-            
+
             setPlatillos(data);
             setError('');
         } catch (err) {
@@ -68,14 +68,14 @@ const GestionPlatillos = ({ navigation }) => {
     // ------------------------------------------------------------------
     useEffect(() => {
         const subscription = supabase
-            .channel('platillos-realtime') 
+            .channel('platillos-realtime')
             .on(
-                'postgres_changes', 
+                'postgres_changes',
                 { event: '*', schema: 'public', table: 'platillos' },
                 () => {
                     // Recargamos los datos manteniendo el término de búsqueda actual
                     console.log('Cambio en Platillos detectado, recargando...');
-                    fetchData(busqueda); 
+                    fetchData(busqueda);
                 }
             )
             .subscribe();
@@ -114,11 +114,11 @@ const GestionPlatillos = ({ navigation }) => {
             "¿Estás seguro de que quieres eliminar este platillo? Esta acción es permanente.",
             [
                 { text: "Cancelar", style: "cancel" },
-                { 
-                    text: "Eliminar", 
+                {
+                    text: "Eliminar",
                     onPress: async () => {
                         try {
-                            await eliminarPlatillo(id); 
+                            await eliminarPlatillo(id);
                             Alert.alert('✅', 'Platillo eliminado.');
                             // Realtime (useEffect) se encargará de actualizar la lista
                         } catch (err) {
@@ -140,7 +140,7 @@ const GestionPlatillos = ({ navigation }) => {
             <View style={styles.filaPlatillo}>
                 <Image
                     // Intentamos usar la URL, si falla, usamos la imagen local por defecto
-                    source={{ uri: item.imagen_url }} 
+                    source={{ uri: item.imagen_url }}
                     style={styles.imagenPlatillo}
                     defaultSource={require(DEFAULT_IMAGE)} // Usar defaultSource para la imagen local
                     onError={() => console.log('Error cargando imagen:', item.imagen_url)}
@@ -178,7 +178,7 @@ const GestionPlatillos = ({ navigation }) => {
     // RENDERIZADO PRINCIPAL
     // ------------------------------------------------------------------
     return (
-        <SafeAreaView style={{ flex: 1 }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#ffe6ea' }} edges={['top', 'left', 'right']}>
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -194,21 +194,21 @@ const GestionPlatillos = ({ navigation }) => {
                     />
 
                     {error !== '' && <Text style={styles.error}>{error}</Text>}
-                    
+
                     {/* INDICADOR DE CARGA */}
                     {isLoading && <ActivityIndicator size="large" color="#007AFF" style={{ marginVertical: 20 }} />}
 
                     {/* MENSAJE DE LISTA VACÍA */}
                     {!isLoading && platillos.length === 0 ? (
                         <Text style={styles.mensajeVacio}>
-                            {busqueda.trim() !== '' 
-                                ? `No hay platillos que coincidan con "${busqueda}"` 
+                            {busqueda.trim() !== ''
+                                ? `No hay platillos que coincidan con "${busqueda}"`
                                 : 'No se encontraron platillos. ¡Crea uno nuevo!'}
                         </Text>
                     ) : (
                         <FlatList
                             data={platillos}
-                            keyExtractor={(item) => item.id} 
+                            keyExtractor={(item) => item.id}
                             renderItem={renderPlatillo}
                             contentContainerStyle={{ paddingBottom: 80 }}
                         />

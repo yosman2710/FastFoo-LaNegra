@@ -14,7 +14,7 @@ export default function HomeScreen() {
         resizeMode="cover"
       >
       </ImageBackground>
-      
+
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.grid}>
@@ -24,11 +24,11 @@ export default function HomeScreen() {
           <IconBox icon="clock" label="Historial Detallado" />
         </View>
         <Text style={styles.subText}>
-            Optimiza tu negocio con mi plataforma personalizada integral de gestión
-          </Text>
+          Optimiza tu negocio con mi plataforma personalizada integral de gestión
+        </Text>
       </ScrollView>
 
-      
+
 
       <TouchableOpacity
         style={styles.button}
@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 120,
     paddingBottom: 100,
-     // espacio para el botón
+    // espacio para el botón
   },
 
   grid: {

@@ -8,22 +8,22 @@ import {
     Alert,
     ActivityIndicator,
     ScrollView,
-    SafeAreaView,
     KeyboardAvoidingView,
     Platform
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { Picker } from '@react-native-picker/picker';
 
 // Importamos servicios de Supabase
-import { obtenerPlatilloPorId, actualizarPlatillo } from '../services/dishService.js'; 
+import { obtenerPlatilloPorId, actualizarPlatillo } from '../services/dishService.js';
 import { obtenerTasaDolar } from '../services/configService.js';
-import { supabase } from '../utils/supabase.js'; 
+import { supabase } from '../utils/supabase.js';
 
 import { styles } from '../styles/crearPlatillos.styles.js';
 
 const BUCKET_NAME = 'imagenes-platillos';
-const DEFAULT_IMAGE_LOCAL = require('../../assets/default-dish.png'); 
+const DEFAULT_IMAGE_LOCAL = require('../../assets/default-dish.png');
 
 // ----------------------------------------------------------------
 // FUNCIÓN AUXILIAR: SUBIR IMAGEN A SUPABASE STORAGE
@@ -33,13 +33,13 @@ const uploadAndGetUrl = async (uri, fileName, contentType) => {
         const response = await fetch(uri);
         const blob = await response.blob();
         const filePath = `${Date.now()}_${fileName}`;
-        
+
         const { error: uploadError } = await supabase.storage
-            .from(BUCKET_NAME) 
+            .from(BUCKET_NAME)
             .upload(filePath, blob, { contentType: contentType, upsert: false });
 
         if (uploadError) throw uploadError;
-        
+
         const { data: publicUrlData } = supabase.storage
             .from(BUCKET_NAME)
             .getPublicUrl(filePath);
@@ -57,13 +57,13 @@ const EditarPlatillos = ({ route, navigation }) => {
     const [platillo, setPlatillo] = useState(null);
     const [nombre, setNombre] = useState('');
     // Usar '' para TextInput
-    const [monto, setMonto] = useState(''); 
+    const [monto, setMonto] = useState('');
     const [moneda, setMoneda] = useState('usd');
     const [descripcion, setDescripcion] = useState('');
-    const [imagenUri, setImagenUri] = useState(''); 
-    const [imagenAsset, setImagenAsset] = useState(null); 
+    const [imagenUri, setImagenUri] = useState('');
+    const [imagenAsset, setImagenAsset] = useState(null);
     // Usar 0 para la tasa si falla la carga
-    const [tasa, setTasa] = useState(null); 
+    const [tasa, setTasa] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false); // Para el botón Guardar
 
@@ -73,7 +73,7 @@ const EditarPlatillos = ({ route, navigation }) => {
                 // 1. Cargar Platillo
                 const datos = await obtenerPlatilloPorId(id);
                 if (!datos) throw new Error('Platillo no encontrado.');
-                
+
                 // 2. Cargar Tasa (Asegurar que sea un número, si falla, null)
                 const tasaGuardadaString = await obtenerTasaDolar();
                 const tasaValor = Number(tasaGuardadaString) || null; // Null si no es un número válido
@@ -86,16 +86,16 @@ const EditarPlatillos = ({ route, navigation }) => {
                 setNombre(datos.nombre);
                 setDescripcion(datos.descripcion || '');
                 setTasa(tasaValor);
-                
+
                 // 3. Inicializar campos
                 if (datos.precio_usd !== undefined && datos.precio_usd !== null) {
                     setMoneda('usd');
                     // Conversión segura a String
-                    setMonto(Number(datos.precio_usd).toFixed(2)); 
+                    setMonto(Number(datos.precio_usd).toFixed(2));
                 }
-                
-                setImagenUri(datos.imagen_url || ''); 
-                
+
+                setImagenUri(datos.imagen_url || '');
+
             } catch (error) {
                 console.error('Error al cargar datos:', error);
                 Alert.alert('Error Fatal', 'No se pudo cargar el platillo. Verifique la conexión: ' + error.message);
@@ -112,15 +112,15 @@ const EditarPlatillos = ({ route, navigation }) => {
         const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.6 });
         if (result.assets && result.assets.length > 0) {
             const asset = result.assets[0];
-            setImagenAsset(asset); 
-            setImagenUri(asset.uri); 
+            setImagenAsset(asset);
+            setImagenUri(asset.uri);
         }
     };
 
     const handleGuardar = async () => {
         setIsSaving(true);
         const montoNum = Number(monto); // Usar Number() para conversión segura
-        
+
         // --- VALIDACIONES ESTRICTAS ---
         if (!nombre.trim()) {
             Alert.alert('Error', 'El nombre del platillo es obligatorio.');
@@ -133,7 +133,7 @@ const EditarPlatillos = ({ route, navigation }) => {
             return;
         }
         if (moneda === 'bs' && !tasa) {
-             Alert.alert('Error', 'No se pudo cargar la tasa de cambio. Guarde el precio en USD.');
+            Alert.alert('Error', 'No se pudo cargar la tasa de cambio. Guarde el precio en USD.');
             setIsSaving(false);
             return;
         }
@@ -144,38 +144,38 @@ const EditarPlatillos = ({ route, navigation }) => {
             precioUsd = montoNum;
         } else { // moneda === 'bs'
             // Usamos || 1 para evitar división por cero, aunque ya validamos que 'tasa' exista.
-            precioUsd = parseFloat((montoNum / (tasa || 1)).toFixed(2)); 
+            precioUsd = parseFloat((montoNum / (tasa || 1)).toFixed(2));
         }
 
         // 2. Subir nueva imagen si se seleccionó una
-        let imagenUrlGuardada = platillo.imagen_url; 
+        let imagenUrlGuardada = platillo.imagen_url;
         if (imagenAsset) {
             try {
                 imagenUrlGuardada = await uploadAndGetUrl(
-                    imagenAsset.uri, 
+                    imagenAsset.uri,
                     imagenAsset.fileName || `imagen_${id}`,
                     imagenAsset.type
                 );
             } catch (e) {
                 // Si falla la subida, avisamos pero permitimos guardar el resto de los datos
                 Alert.alert('Error', 'No se pudo subir la nueva imagen. Se guardarán los datos de texto.');
-                imagenUrlGuardada = platillo.imagen_url; 
+                imagenUrlGuardada = platillo.imagen_url;
             }
         }
-        
+
         // 3. Preparar el objeto para la ACTUALIZACIÓN
         const platilloActualizado = {
             nombre: nombre.trim(),
-            precio_usd: precioUsd, 
+            precio_usd: precioUsd,
             descripcion: descripcion.trim(),
-            imagen_url: imagenUrlGuardada, 
+            imagen_url: imagenUrlGuardada,
             // Podrías añadir aquí 'activo' si lo usas en el formulario
         };
 
         try {
             // 4. Actualizar el registro en la base de datos
-            await actualizarPlatillo(id, platilloActualizado); 
-            
+            await actualizarPlatillo(id, platilloActualizado);
+
             Alert.alert('✅ Éxito', 'Platillo actualizado exitosamente.');
             navigation.goBack();
         } catch (error) {
@@ -194,11 +194,11 @@ const EditarPlatillos = ({ route, navigation }) => {
             </View>
         );
     }
-    
+
     // Cálculos de precios seguros (usando Number() y || 0 para evitar fallos de NaN)
     const montoBase = Number(monto) || 0;
     const tasaActual = Number(tasa) || 0;
-    
+
     const precioUsdCalculado = moneda === 'usd' ? montoBase.toFixed(2) : (montoBase / (tasaActual || 1))?.toFixed(2) || '...';
     const precioBsCalculado = moneda === 'bs' ? montoBase.toFixed(2) : (montoBase * tasaActual)?.toFixed(2) || '...';
 
@@ -229,7 +229,7 @@ const EditarPlatillos = ({ route, navigation }) => {
                         <Text style={styles.resumenTexto}>Bs (Estimado): Bs {precioBsCalculado}</Text>
                         {tasaActual === 0 && <Text style={{ color: 'red', marginTop: 5 }}>Tasa de cambio no disponible.</Text>}
                     </View>
-                    
+
                     <Text style={styles.seccionTitulo}>Información del Platillo</Text>
 
                     {/* ... (Resto de los inputs y picker) ... */}
@@ -241,7 +241,7 @@ const EditarPlatillos = ({ route, navigation }) => {
                         value={nombre}
                         onChangeText={setNombre}
                     />
-                    
+
                     {/* Picker Moneda */}
                     <Text style={styles.label}>Moneda del Precio</Text>
                     <Picker
@@ -272,24 +272,24 @@ const EditarPlatillos = ({ route, navigation }) => {
                         value={descripcion}
                         onChangeText={setDescripcion}
                     />
-                    
+
                     {/* Sección Imagen */}
                     <Text style={styles.label}>Imagen del Platillo</Text>
                     <TouchableOpacity style={styles.imageContainer} onPress={seleccionarImagen}>
                         {imagenUri ? (
-                            <Image 
-                                source={{ uri: imagenUri }} 
-                                style={{ width: '100%', height: '100%', borderRadius: 10 }} 
+                            <Image
+                                source={{ uri: imagenUri }}
+                                style={{ width: '100%', height: '100%', borderRadius: 10 }}
                             />
                         ) : (
-                            <Image 
-                                source={DEFAULT_IMAGE_LOCAL} 
-                                style={{ width: '100%', height: '100%', borderRadius: 10 }} 
+                            <Image
+                                source={DEFAULT_IMAGE_LOCAL}
+                                style={{ width: '100%', height: '100%', borderRadius: 10 }}
                                 resizeMode="cover"
                             />
                         )}
                     </TouchableOpacity>
-                    
+
                 </ScrollView>
             </KeyboardAvoidingView>
         </SafeAreaView>

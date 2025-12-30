@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useFocusEffect } from '@react-navigation/native'; 
+import { useFocusEffect } from '@react-navigation/native';
 import {
     View,
     Text,
@@ -7,16 +7,16 @@ import {
     TextInput,
     TouchableOpacity,
     Alert,
-    ActivityIndicator,
-    SafeAreaView // 🛑 Ya importado
+    ActivityIndicator, // 🛑 Ya importado
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 // 🛑 Importamos iconos (si usas Expo, puedes usar @expo/vector-icons, sino, instala react-native-vector-icons)
 // Para simplificar, mantendré los emojis en el texto como lo tenías, pero el diseño mejora.
 
 // Importa tus servicios y utilidades
-import { supabase } from '../utils/supabase.js'; 
-import { obtenerPedidos, eliminarPedido } from '../services/orderServices.js'; 
-import { styles } from '../styles/gestionPedidos.style.js'; 
+import { supabase } from '../utils/supabase.js';
+import { obtenerPedidos, eliminarPedido } from '../services/orderServices.js';
+import { styles } from '../styles/gestionPedidos.style.js';
 
 const GestionPedidos = ({ navigation }) => {
     const [pedidos, setPedidos] = useState([]);
@@ -25,38 +25,38 @@ const GestionPedidos = ({ navigation }) => {
 
     const cargarPedidos = useCallback(async () => {
         try {
-            const data = await obtenerPedidos(); 
+            const data = await obtenerPedidos();
             const actualizados = data.map(p => ({
                 ...p,
-                estado: p.estado || 'pendiente' 
+                estado: p.estado || 'pendiente'
             }));
-            
+
             // Revertir el orden para mostrar el más nuevo primero
-            setPedidos(actualizados.reverse()); 
-            
+            setPedidos(actualizados.reverse());
+
         } catch (error) {
             console.error("Error al cargar pedidos:", error);
             Alert.alert("Error de Conexión", "No se pudieron cargar los pedidos desde la nube.");
         } finally {
             setIsLoading(false);
         }
-    }, []); 
+    }, []);
 
     useFocusEffect(
         useCallback(() => {
             cargarPedidos();
-            return () => {}; 
+            return () => { };
         }, [cargarPedidos])
     );
-    
+
     useEffect(() => {
         const subscription = supabase
             .channel('pedidos-channel')
             .on(
-                'postgres_changes', 
+                'postgres_changes',
                 { event: '*', schema: 'public', table: 'pedidos' },
                 () => {
-                    cargarPedidos(); 
+                    cargarPedidos();
                 }
             )
             .subscribe();
@@ -64,12 +64,12 @@ const GestionPedidos = ({ navigation }) => {
         return () => {
             supabase.removeChannel(subscription);
         };
-    }, [cargarPedidos]); 
+    }, [cargarPedidos]);
 
     const filtrarPedidos = () => {
         return pedidos.filter(p =>
             (p.clientName?.toLowerCase().includes(busqueda.toLowerCase()) ||
-            p.cliente_nombre?.toLowerCase().includes(busqueda.toLowerCase())) ||
+                p.cliente_nombre?.toLowerCase().includes(busqueda.toLowerCase())) ||
             p.id.includes(busqueda)
         );
     };
@@ -85,17 +85,17 @@ const GestionPedidos = ({ navigation }) => {
                 onPress: async () => {
                     try {
                         // 1. Ejecutar la eliminación en Supabase
-                        await eliminarPedido(id); 
-                        
+                        await eliminarPedido(id);
+
                         // 2. 🛑 ACTUALIZACIÓN INMEDIATA DEL ESTADO LOCAL
-                        setPedidos(currentPedidos => 
+                        setPedidos(currentPedidos =>
                             currentPedidos.filter(p => p.id !== id)
                         );
-                        
+
                         Alert.alert('✅ Éxito', 'Pedido eliminado correctamente.');
                     } catch (error) {
                         // Si falla, podrías volver a cargar la lista para asegurar la consistencia:
-                        cargarPedidos(); 
+                        cargarPedidos();
                         console.error('Error al eliminar pedido:', error);
                         Alert.alert('Error', 'No se pudo eliminar el pedido de la nube.');
                     }
@@ -123,7 +123,7 @@ const GestionPedidos = ({ navigation }) => {
         const saldoPendiente = (totalUsd - pagadoUsd).toFixed(2);
         const totalUsdFormatted = totalUsd.toFixed(2);
         const pagadoUsdFormatted = pagadoUsd.toFixed(2);
-        
+
         // Función para navegar al detalle
         const handleVerDetalle = () => {
             navigation.navigate('DetallePedido', { id: item.id });
@@ -131,12 +131,12 @@ const GestionPedidos = ({ navigation }) => {
 
         return (
             // 🛑 CAMBIO CLAVE: La tarjeta entera es el botón de "Ver"
-            <TouchableOpacity 
-                style={styles.card} 
+            <TouchableOpacity
+                style={styles.card}
                 onPress={handleVerDetalle}
                 activeOpacity={0.7} // Retroalimentación visual al presionar
-            > 
-                
+            >
+
                 {/* FILA 1: Nombre del Cliente y Estado (Header) */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 5 }}>
                     <Text style={styles.nombre}>
@@ -158,7 +158,7 @@ const GestionPedidos = ({ navigation }) => {
                         </Text>
                     </View>
                 </View>
-                
+
                 {/* FILA 3: Monto Pagado */}
                 <View style={styles.infoContainer}>
                     <Text style={styles.pagado}>Pagado: ${pagadoUsdFormatted}</Text>
@@ -170,11 +170,11 @@ const GestionPedidos = ({ navigation }) => {
                         Saldo Pendiente: ${saldoPendiente}
                     </Text>
                 )}
-                
+
                 {/* FILA 4: Acciones (Solo queda Eliminar) */}
                 <View style={styles.acciones}>
                     {/* Dejamos un espacio vacío para alinear el botón Eliminar a la derecha */}
-                    <View style={{ flex: 1 }} /> 
+                    <View style={{ flex: 1 }} />
 
                     <TouchableOpacity
                         style={styles.botonEliminar}
@@ -189,7 +189,7 @@ const GestionPedidos = ({ navigation }) => {
             </TouchableOpacity>
         );
     };
-    
+
     if (isLoading) {
         return (
             // 🛑 Usamos SafeAreaView para el estado de carga también
@@ -199,10 +199,10 @@ const GestionPedidos = ({ navigation }) => {
             </SafeAreaView>
         );
     }
-    
+
     return (
         // 🛑 Implementación final de SafeAreaView como contenedor principal
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <Text style={styles.titulo}>Mis Pedidos</Text>
 
             <TextInput

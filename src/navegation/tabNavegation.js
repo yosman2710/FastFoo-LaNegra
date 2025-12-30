@@ -1,16 +1,20 @@
 import React from 'react';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import GestionPedidos from '../screens/gestionPedidos';
 import GestionPlatillos from '../screens/gestionPlatillos';
 import Configuracion from '../screens/confi';
-import Ionicons from 'react-native-vector-icons/Ionicons';
 
-const Tab = createBottomTabNavigator();
+const Tab = createMaterialTopTabNavigator();
 
 export default function TabNavigator() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tab.Navigator
       initialRouteName="Pedidos"
+      tabBarPosition="bottom"
       screenOptions={({ route }) => {
         let iconName;
 
@@ -23,12 +27,32 @@ export default function TabNavigator() {
         }
 
         return {
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name={iconName} size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={iconName} size={24} color={color} />
           ),
           tabBarActiveTintColor: '#6c2aa8',
           tabBarInactiveTintColor: 'gray',
-          headerShown: false,
+          tabBarIndicatorStyle: {
+            backgroundColor: '#6c2aa8',
+            height: 3,
+            top: 0,
+          },
+          tabBarStyle: {
+            backgroundColor: 'white',
+            paddingBottom: insets.bottom,
+            height: 60 + insets.bottom,
+            borderTopWidth: 1,
+            borderTopColor: '#f0f0f0',
+            elevation: 0,
+            shadowOpacity: 0,
+          },
+          tabBarLabelStyle: {
+            fontSize: 10,
+            textTransform: 'none',
+            marginTop: -5,
+          },
+          animationEnabled: true,
+          swipeEnabled: true,
         };
       }}
     >

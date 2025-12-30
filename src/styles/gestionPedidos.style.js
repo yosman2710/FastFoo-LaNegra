@@ -24,7 +24,6 @@ export const styles = StyleSheet.create({
         marginBottom: 20,
         borderWidth: 1,
         borderColor: '#ccc',
-        // Sombra sutil para elevar la barra de búsqueda
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.1,
@@ -38,7 +37,7 @@ export const styles = StyleSheet.create({
         borderRadius: 12, // Bordes más suaves
         marginBottom: 14,
         // Sombra suave para elevación sutil
-        shadowColor: '#000', 
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.15,
         shadowRadius: 3,
@@ -93,27 +92,27 @@ export const styles = StyleSheet.create({
     // --- Acciones y Botones ---
     // En tu archivo gestionPedidos.style.js:
 
-// 🛑 ELIMINA O COMENTA ESTOS ESTILOS:
-// botonVer: {
-//     backgroundColor: '#2196F3',
-//     paddingVertical: 10,
-//     paddingHorizontal: 20,
-//     borderRadius: 20, 
-//     minWidth: 100,
-//     justifyContent: 'center',
-//     alignItems: 'center',
-// },
+    // 🛑 ELIMINA O COMENTA ESTOS ESTILOS:
+    // botonVer: {
+    //     backgroundColor: '#2196F3',
+    //     paddingVertical: 10,
+    //     paddingHorizontal: 20,
+    //     borderRadius: 20, 
+    //     minWidth: 100,
+    //     justifyContent: 'center',
+    //     alignItems: 'center',
+    // },
 
-// 🛑 Y ajusta la sección 'acciones' para que el botón Eliminar se alinee correctamente a la derecha:
-acciones: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end', 
-    alignItems: 'center', 
-    marginTop: 15,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0', 
-},
+    // 🛑 Y ajusta la sección 'acciones' para que el botón Eliminar se alinee correctamente a la derecha:
+    acciones: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        marginTop: 15,
+        paddingTop: 10,
+        borderTopWidth: 1,
+        borderTopColor: '#f0f0f0',
+    },
     botonVer: {
         backgroundColor: '#2196F3',
         paddingVertical: 10,

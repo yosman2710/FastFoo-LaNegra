@@ -5,14 +5,14 @@ import {
     FlatList,
     TextInput,
     TouchableOpacity,
-    Alert,
-    SafeAreaView // 🛑 Añadido para mejor UI/UX
+    Alert,// 🛑 Añadido para mejor UI/UX
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Importamos las funciones de servicio actualizadas:
-import { obtenerPlatillos } from '../services/dishService.js'; 
-import { guardarPedido } from '../services/orderServices.js'; 
-import { obtenerTasaDolar } from '../services/configService.js'; 
+import { obtenerPlatillos } from '../services/dishService.js';
+import { guardarPedido } from '../services/orderServices.js';
+import { obtenerTasaDolar } from '../services/configService.js';
 import { styles } from '../styles/crearPedidos.style.js';
 
 const CrearPedido = ({ navigation }) => {
@@ -20,9 +20,9 @@ const CrearPedido = ({ navigation }) => {
     const [cantidades, setCantidades] = useState({});
     const [cliente, setCliente] = useState('');
     // 🛑 NUEVO: Estado para el término de búsqueda de platillos
-    const [busqueda, setBusqueda] = useState(''); 
+    const [busqueda, setBusqueda] = useState('');
     // 🛑 ELIMINADO: Ya no se usa el estado de dirección
-    const [tasa, setTasa] = useState(null); 
+    const [tasa, setTasa] = useState(null);
 
     useEffect(() => {
         const cargarDatos = async () => {
@@ -30,14 +30,14 @@ const CrearPedido = ({ navigation }) => {
                 // 1. Cargar Platillos desde Supabase
                 const data = await obtenerPlatillos();
                 setPlatillos(data);
-                
+
                 const inicial = {};
                 data.forEach(p => { inicial[p.id] = 0; });
                 setCantidades(inicial);
 
                 // 2. Cargar Tasa de Dólar desde Supabase
                 const valorTasaString = await obtenerTasaDolar();
-                setTasa(parseFloat(valorTasaString)); 
+                setTasa(parseFloat(valorTasaString));
 
             } catch (error) {
                 console.error('Error al cargar datos iniciales:', error);
@@ -59,14 +59,14 @@ const CrearPedido = ({ navigation }) => {
         if (tasa === null) return { usd: '0.00', bs: '0.00' };
 
         let totalUsd = 0;
-        
+
         // Iterar sobre la lista COMPLETA de platillos
         platillos.forEach(p => {
             const cantidad = cantidades[p.id] || 0;
-            const usd = p.precio_usd || 0; 
+            const usd = p.precio_usd || 0;
             totalUsd += cantidad * usd;
         });
-        
+
         const totalBs = totalUsd * tasa;
 
         return {
@@ -82,7 +82,7 @@ const CrearPedido = ({ navigation }) => {
             .map(p => ({
                 id: p.id,
                 nombre: p.nombre,
-                precio_unitario_usd: p.precio_usd, 
+                precio_unitario_usd: p.precio_usd,
                 cantidad: cantidades[p.id]
             }));
 
@@ -101,20 +101,20 @@ const CrearPedido = ({ navigation }) => {
         // 2. Preparar el objeto para la función guardarPedido
         const nuevoPedido = {
             cliente_nombre: cliente,
-            items: items, 
+            items: items,
             total_usd: parseFloat(total.usd),
         };
 
         try {
             await guardarPedido(nuevoPedido);
-            
+
             Alert.alert('✅ Éxito', 'Pedido creado y guardado en la nube exitosamente');
-            
+
             // Limpiar y volver
             setCliente('');
             setCantidades({});
             navigation.goBack();
-            
+
         } catch (error) {
             console.error('Error al guardar pedido:', error);
             Alert.alert('Error', 'Hubo un problema al guardar el pedido en Supabase.');
@@ -127,7 +127,7 @@ const CrearPedido = ({ navigation }) => {
             return platillos;
         }
         const lowerCaseBusqueda = busqueda.toLowerCase().trim();
-        return platillos.filter(p => 
+        return platillos.filter(p =>
             p.nombre?.toLowerCase().includes(lowerCaseBusqueda)
         );
     };
@@ -135,7 +135,7 @@ const CrearPedido = ({ navigation }) => {
     const renderItem = ({ item }) => {
         // Obtenemos el precio en Bolívares en tiempo real para la UI
         const precioBsCalculado = tasa ? (item.precio_usd * tasa).toFixed(2) : '...';
-        
+
         return (
             <View style={styles.item}>
                 <Text style={styles.nombre}>{item.nombre}</Text>
@@ -169,7 +169,7 @@ const CrearPedido = ({ navigation }) => {
                     value={cliente}
                     onChangeText={setCliente}
                 />
-                
+
                 {/* 🛑 NUEVO: Campo de búsqueda de platillos */}
                 <TextInput
                     style={styles.input}
@@ -181,8 +181,8 @@ const CrearPedido = ({ navigation }) => {
                 <FlatList
                     style={styles.listaPlatillos}
                     // 🛑 CAMBIO: Usamos la lista filtrada
-                    data={listaFinal} 
-                    keyExtractor={(item) => item.id} 
+                    data={listaFinal}
+                    keyExtractor={(item) => item.id}
                     renderItem={renderItem}
                     ListEmptyComponent={() => (
                         <Text style={{ textAlign: 'center', marginTop: 20, color: '#777' }}>
