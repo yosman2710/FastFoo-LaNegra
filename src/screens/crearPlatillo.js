@@ -36,10 +36,9 @@ const uploadAndGetUrl = async (uri) => {
         encoding: FileSystem.EncodingType.Base64,
     });
 
-    // 2. Establecer el tipo MIME y extensión (puedes intentar extraerlo del URI si es complejo)
-    // Para simplificar y dado que el Base64 lo maneja, usamos un estándar.
-    const mimeType = 'image/jpeg';
-    const fileExt = 'jpeg';
+    // 2. Deducir tipo MIME y extensión
+    const fileExt = uri.split('.').pop().toLowerCase() || 'jpeg';
+    const mimeType = fileExt === 'png' ? 'image/png' : 'image/jpeg';
 
     // 3. Crear el nombre de archivo único para Supabase
     const filePath = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
