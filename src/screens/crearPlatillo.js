@@ -29,11 +29,12 @@ const BUCKET_NAME = 'imagenes-platillos';
 // -----------------------------------------------------------------
 // FUNCIÓN AUXILIAR CORREGIDA: SUBIR IMAGEN USANDO BASE64 Y FileSystem
 // -----------------------------------------------------------------
-// 🛑 Ya no necesitamos el 'fileName' en los argumentos, el nombre se genera internamente.
+import { decode } from 'base64-arraybuffer';
+
 const uploadAndGetUrl = async (uri) => {
     // 1. Leer el archivo como Base64 usando Expo FileSystem
     const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
+        encoding: 'base64',
     });
 
     // 2. Deducir tipo MIME y extensión
@@ -43,23 +44,23 @@ const uploadAndGetUrl = async (uri) => {
     // 3. Crear el nombre de archivo único para Supabase
     const filePath = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
 
-    // 4. Subir la cadena Base64 a Supabase Storage
+    // 4. Decodificar el base64 a ArrayBuffer (para evitar bugs de React Native)
+    const arrayBuffer = decode(base64);
+
+    // 5. Subir a Supabase Storage
     const { error: uploadError } = await supabase.storage
         .from(BUCKET_NAME)
-        // Usamos la cadena Base64
-        .upload(filePath, base64, {
+        .upload(filePath, arrayBuffer, {
             contentType: mimeType,
             upsert: false,
-            // 🛑 CRÍTICO: Indica a Supabase que el contenido es Base64
-            decode: true,
         });
 
     if (uploadError) {
         console.error('Error Detallado de Subida a Supabase:', uploadError);
-        throw new Error(`Fallo de Supabase: ${uploadError.message}. Verifica las políticas RLS o el log.`);
+        throw new Error(`Fallo de Supabase: ${uploadError.message}`);
     }
 
-    // 5. Obtener la URL pública de acceso
+    // 6. Obtener la URL pública de acceso
     const { data: publicUrlData } = supabase.storage
         .from(BUCKET_NAME)
         .getPublicUrl(filePath);
