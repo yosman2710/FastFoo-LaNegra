@@ -4,7 +4,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import GestionPedidos from '../screens/gestionPedidos';
 import GestionPlatillos from '../screens/gestionPlatillos';
-import Configuracion from '../screens/confi';
 
 const Tab = createMaterialTopTabNavigator();
 
@@ -17,39 +16,42 @@ export default function TabNavigator() {
       tabBarPosition="bottom"
       screenOptions={({ route }) => {
         let iconName;
-
         if (route.name === 'Pedidos') {
           iconName = 'fast-food-outline';
         } else if (route.name === 'Platillos') {
           iconName = 'restaurant-outline';
-        } else if (route.name === 'Configuración') {
-          iconName = 'settings-outline';
         }
 
         return {
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={iconName} size={24} color={color} />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name={iconName} size={22} color={color} />
           ),
-          tabBarActiveTintColor: '#6c2aa8',
-          tabBarInactiveTintColor: 'gray',
+          tabBarActiveTintColor: '#c21c1c',
+          tabBarInactiveTintColor: '#aaa',
           tabBarIndicatorStyle: {
-            backgroundColor: '#6c2aa8',
+            backgroundColor: '#c21c1c',
             height: 3,
             top: 0,
+            borderRadius: 2,
           },
           tabBarStyle: {
-            backgroundColor: 'white',
+            backgroundColor: '#fff',
             paddingBottom: insets.bottom,
-            height: 60 + insets.bottom,
+            height: 62 + insets.bottom,
             borderTopWidth: 1,
             borderTopColor: '#f0f0f0',
-            elevation: 0,
-            shadowOpacity: 0,
+            elevation: 12,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: -3 },
+            shadowOpacity: 0.08,
+            shadowRadius: 8,
           },
           tabBarLabelStyle: {
-            fontSize: 10,
+            fontSize: 11,
+            fontWeight: '600',
             textTransform: 'none',
-            marginTop: -5,
+            marginTop: -4,
+            letterSpacing: 0.2,
           },
           animationEnabled: true,
           swipeEnabled: true,
@@ -58,7 +60,6 @@ export default function TabNavigator() {
     >
       <Tab.Screen name="Pedidos" component={GestionPedidos} />
       <Tab.Screen name="Platillos" component={GestionPlatillos} />
-      <Tab.Screen name="Configuración" component={Configuracion} />
     </Tab.Navigator>
   );
 }

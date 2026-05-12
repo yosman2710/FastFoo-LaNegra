@@ -10,211 +10,165 @@ import {
     TouchableOpacity,
     KeyboardAvoidingView,
     Platform,
-    ActivityIndicator // Añadimos indicador de carga
+    ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
-// Importamos el cliente Supabase para la función Realtime
 import { supabase } from '../utils/supabase.js';
 import {
     obtenerPlatillos,
     buscarPlatilloPorNombre,
     eliminarPlatillo
 } from '../services/dishService.js';
-
 import { styles } from '../styles/gestionPlatillos.styles.js';
+import UserMenu from '../components/UserMenu.js';
 
-const DEFAULT_IMAGE = '../../assets/default-dish.png'; // Usar una URL pública o asegurar la ruta local
+const DEFAULT_IMAGE = require('../../assets/default-dish.png');
 
 const GestionPlatillos = ({ navigation }) => {
     const [platillos, setPlatillos] = useState([]);
     const [busqueda, setBusqueda] = useState('');
     const [error, setError] = useState('');
-    const [isLoading, setIsLoading] = useState(false); // Estado de carga
+    const [isLoading, setIsLoading] = useState(false);
+
     const fetchData = useCallback(async (term) => {
         setIsLoading(true);
         try {
-            let data;
-            const searchTerm = term.trim();
-
-            if (searchTerm === '') {
-                data = await obtenerPlatillos();
-            } else {
-                data = await buscarPlatilloPorNombre(searchTerm);
-            }
-
+            const data = term.trim() === ''
+                ? await obtenerPlatillos()
+                : await buscarPlatilloPorNombre(term.trim());
             setPlatillos(data);
             setError('');
         } catch (err) {
-            setError('❌ Error al cargar/buscar los platillos.');
-            console.error("Error en fetchData:", err);
+            setError('Error al cargar los platillos.');
+            console.error(err);
         } finally {
             setIsLoading(false);
         }
-    }, []); // Dependencias vacías, solo se crea una vez
+    }, []);
 
-    // ------------------------------------------------------------------
-    // 1. CARGA DE DATOS PRINCIPAL (Al enfocar la pantalla) 
-    // Esto asegura que la lista se actualice al volver de Crear/Editar
-    // ------------------------------------------------------------------
     useFocusEffect(
-        useCallback(() => {
-            fetchData(busqueda);
-        }, [busqueda, fetchData]) // Depende de busqueda y fetchData (que es estable)
+        useCallback(() => { fetchData(busqueda); }, [busqueda, fetchData])
     );
 
-    // ------------------------------------------------------------------
-    // 2. REALTIME (Recarga cuando hay cambios en la base de datos) 📢
-    // ------------------------------------------------------------------
     useEffect(() => {
         const subscription = supabase
             .channel('platillos-realtime')
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'platillos' },
-                () => {
-                    // Recargamos los datos manteniendo el término de búsqueda actual
-                    console.log('Cambio en Platillos detectado, recargando...');
-                    fetchData(busqueda);
-                }
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(subscription);
-        };
-    }, [busqueda, fetchData]); // Depende de busqueda y fetchData
-
-    // ------------------------------------------------------------------
-    // 3. BÚSQUEDA CON DEBOUNCE (Optimiza la consulta en Supabase)
-    // ------------------------------------------------------------------
-    useEffect(() => {
-        const delayDebounce = setTimeout(() => {
-            // Ya no llamamos a fetchData aquí, useFocusEffect lo manejará al cambiar busqueda
-            // Sin embargo, mantenemos la estructura para un control más fino si fuera necesario.
-            // Si quieres que la búsqueda sea inmediata al escribir, puedes eliminar este useEffect
-            // y depender únicamente de useFocusEffect, pero el debounce es mejor para el rendimiento.
-            if (busqueda.trim() !== '') {
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'platillos' }, () => {
                 fetchData(busqueda);
-            } else if (platillos.length === 0 && !isLoading) {
-                // Si borra el texto de búsqueda y la lista está vacía, recarga todos
-                fetchData('');
-            }
-        }, 300);
+            })
+            .subscribe();
+        return () => { supabase.removeChannel(subscription); };
+    }, [busqueda, fetchData]);
 
-        return () => clearTimeout(delayDebounce);
+    useEffect(() => {
+        const t = setTimeout(() => {
+            if (busqueda.trim() !== '') fetchData(busqueda);
+            else if (platillos.length === 0 && !isLoading) fetchData('');
+        }, 300);
+        return () => clearTimeout(t);
     }, [busqueda]);
 
-    // ------------------------------------------------------------------
-    // MANEJADOR DE ELIMINACIÓN
-    // ------------------------------------------------------------------
     const handleEliminar = async (id) => {
         Alert.alert(
-            "Confirmar Eliminación",
-            "¿Estás seguro de que quieres eliminar este platillo? Esta acción es permanente.",
+            "Eliminar platillo",
+            "¿Estás seguro? Esta acción es permanente.",
             [
                 { text: "Cancelar", style: "cancel" },
                 {
                     text: "Eliminar",
+                    style: "destructive",
                     onPress: async () => {
                         try {
                             await eliminarPlatillo(id);
                             Alert.alert('✅', 'Platillo eliminado.');
-                            // Realtime (useEffect) se encargará de actualizar la lista
                         } catch (err) {
-                            Alert.alert('Error', 'No se pudo eliminar el platillo de la nube.');
-                            console.error(err);
+                            Alert.alert('Error', 'No se pudo eliminar el platillo.');
                         }
-                    },
-                    style: "destructive"
+                    }
                 }
             ]
         );
     };
 
-    // ------------------------------------------------------------------
-    // RENDERIZADO DEL ITEM DE LA LISTA
-    // ------------------------------------------------------------------
     const renderPlatillo = ({ item }) => (
-        <View style={styles.card}>
+        <TouchableOpacity
+            style={styles.card}
+            onPress={() => navigation.navigate('DetallePlatillo', { id: item.id })}
+            activeOpacity={0.75}
+        >
             <View style={styles.filaPlatillo}>
                 <Image
-                    // Intentamos usar la URL, si falla, usamos la imagen local por defecto
-                    source={{ uri: item.imagen_url }}
+                    source={item.imagen_url ? { uri: item.imagen_url } : DEFAULT_IMAGE}
                     style={styles.imagenPlatillo}
-                    defaultSource={require(DEFAULT_IMAGE)} // Usar defaultSource para la imagen local
-                    onError={() => console.log('Error cargando imagen:', item.imagen_url)}
+                    defaultSource={DEFAULT_IMAGE}
+                    onError={() => { }}
                 />
                 <View style={styles.infoPlatillo}>
                     <Text style={styles.nombrePlatillo} numberOfLines={1}>{item.nombre}</Text>
                     <Text style={styles.precioPlatillo}>
-                        Precio: {item.precio_usd ? `$${Number(item.precio_usd).toFixed(2)}` : 'N/A'}
+                        {item.precio_usd ? `$${Number(item.precio_usd).toFixed(2)}` : 'N/A'}
                     </Text>
                     <Text style={styles.descripcionPlatillo} numberOfLines={2}>
                         {item.descripcion}
                     </Text>
                 </View>
+                <Ionicons name="chevron-forward" size={20} color="#ccc" style={{ marginLeft: 4 }} />
             </View>
-
-            <View style={styles.botonesFila}>
-                <TouchableOpacity
-                    style={[styles.botonAccion, styles.botonEditar]}
-                    onPress={() => navigation.navigate('EditarPlatillo', { id: item.id })}
-                >
-                    <Text style={styles.textoBoton}>✏️ Editar</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={[styles.botonAccion, styles.botonEliminar]}
-                    onPress={() => handleEliminar(item.id)}
-                >
-                    <Text style={styles.textoBoton}>🗑️ Eliminar</Text>
-                </TouchableOpacity>
-            </View>
-        </View>
+        </TouchableOpacity>
     );
 
-    // ------------------------------------------------------------------
-    // RENDERIZADO PRINCIPAL
-    // ------------------------------------------------------------------
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#ffe6ea' }} edges={['top', 'left', 'right']}>
-            <KeyboardAvoidingView
-                style={{ flex: 1 }}
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            >
-                <View style={styles.container}>
-                    <Text style={styles.titulo}>Gestión de Platillos</Text>
+        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
 
+                {/* Header rojo con menú integrado */}
+                <View style={styles.header}>
+                    <View>
+                        <Text style={styles.titulo}>Platillos</Text>
+                        <Text style={styles.subtituloHeader}>{platillos.length} en el menú</Text>
+                    </View>
+                    <UserMenu />
+                </View>
+
+                {/* Búsqueda */}
+                <View style={styles.searchWrapper}>
+                    <Ionicons name="search-outline" size={18} color="#aaa" style={{ marginRight: 8 }} />
                     <TextInput
-                        style={[styles.inputBuscar, { marginBottom: 20 }]}
-                        placeholder="🔍 Buscar platillo por nombre..."
+                        style={styles.inputBuscar}
+                        placeholder="Buscar platillo…"
                         value={busqueda}
                         onChangeText={setBusqueda}
+                        placeholderTextColor="#bbb"
                     />
+                </View>
 
+                {/* Contenedor relativo para lista + FAB */}
+                <View style={{ flex: 1 }}>
                     {error !== '' && <Text style={styles.error}>{error}</Text>}
 
-                    {/* INDICADOR DE CARGA */}
-                    {isLoading && <ActivityIndicator size="large" color="#007AFF" style={{ marginVertical: 20 }} />}
-
-                    {/* MENSAJE DE LISTA VACÍA */}
-                    {!isLoading && platillos.length === 0 ? (
-                        <Text style={styles.mensajeVacio}>
-                            {busqueda.trim() !== ''
-                                ? `No hay platillos que coincidan con "${busqueda}"`
-                                : 'No se encontraron platillos. ¡Crea uno nuevo!'}
-                        </Text>
+                    {isLoading ? (
+                        <ActivityIndicator size="large" color="#c21c1c" style={{ marginTop: 40 }} />
+                    ) : platillos.length === 0 ? (
+                        <View style={{ alignItems: 'center', marginTop: 60 }}>
+                            <Ionicons name="restaurant-outline" size={52} color="#ddd" />
+                            <Text style={styles.mensajeVacio}>
+                                {busqueda.trim() !== ''
+                                    ? `Sin resultados para "${busqueda}"`
+                                    : 'No hay platillos. ¡Crea uno!'}
+                            </Text>
+                        </View>
                     ) : (
                         <FlatList
                             data={platillos}
                             keyExtractor={(item) => item.id}
                             renderItem={renderPlatillo}
-                            contentContainerStyle={{ paddingBottom: 80 }}
+                            contentContainerStyle={styles.listContent}
                         />
                     )}
 
-                    {/* BOTÓN FLOTANTE */}
+                    {/* FAB */}
                     <TouchableOpacity
                         style={styles.botonFlotante}
                         onPress={() => navigation.navigate('CrearPlatillo')}

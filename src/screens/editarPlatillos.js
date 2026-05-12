@@ -9,178 +9,121 @@ import {
     ActivityIndicator,
     ScrollView,
     KeyboardAvoidingView,
-    Platform
+    Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { launchImageLibrary } from 'react-native-image-picker';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Picker } from '@react-native-picker/picker';
+import { decode } from 'base64-arraybuffer';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
-// Importamos servicios de Supabase
 import { obtenerPlatilloPorId, actualizarPlatillo } from '../services/dishService.js';
 import { obtenerTasaDolar } from '../services/configService.js';
 import { supabase } from '../utils/supabase.js';
-
 import { styles } from '../styles/crearPlatillos.styles.js';
 
-const BUCKET_NAME = 'imagenes-platillos';
+const BUCKET_NAME       = 'imagenes-platillos';
 const DEFAULT_IMAGE_LOCAL = require('../../assets/default-dish.png');
 
-// ----------------------------------------------------------------
-// FUNCIÓN AUXILIAR: SUBIR IMAGEN A SUPABASE STORAGE
-// -----------------------------------------------------------------
-const uploadAndGetUrl = async (uri, fileName, contentType) => {
-    try {
-        const response = await fetch(uri);
-        const blob = await response.blob();
-        const filePath = `${Date.now()}_${fileName}`;
+const uploadAndGetUrl = async (uri) => {
+    const base64      = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
+    const fileExt     = uri.split('.').pop().toLowerCase() || 'jpeg';
+    const mimeType    = fileExt === 'png' ? 'image/png' : 'image/jpeg';
+    const filePath    = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+    const arrayBuffer = decode(base64);
 
-        const { error: uploadError } = await supabase.storage
-            .from(BUCKET_NAME)
-            .upload(filePath, blob, { contentType: contentType, upsert: false });
+    const { error: uploadError } = await supabase.storage
+        .from(BUCKET_NAME)
+        .upload(filePath, arrayBuffer, { contentType: mimeType, upsert: false });
 
-        if (uploadError) throw uploadError;
+    if (uploadError) throw new Error(`Fallo: ${uploadError.message}`);
 
-        const { data: publicUrlData } = supabase.storage
-            .from(BUCKET_NAME)
-            .getPublicUrl(filePath);
-
-        return publicUrlData.publicUrl;
-    } catch (e) {
-        console.error('Error en uploadAndGetUrl:', e);
-        throw new Error('Falló al subir la imagen al Storage.');
-    }
+    const { data } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filePath);
+    return data.publicUrl;
 };
 
 const EditarPlatillos = ({ route, navigation }) => {
     const { id } = route.params;
 
-    const [platillo, setPlatillo] = useState(null);
-    const [nombre, setNombre] = useState('');
-    // Usar '' para TextInput
-    const [monto, setMonto] = useState('');
-    const [moneda, setMoneda] = useState('usd');
+    const [platillo,    setPlatillo]    = useState(null);
+    const [nombre,      setNombre]      = useState('');
+    const [monto,       setMonto]       = useState('');
+    const [moneda,      setMoneda]      = useState('usd');
     const [descripcion, setDescripcion] = useState('');
-    const [imagenUri, setImagenUri] = useState('');
+    const [imagenUri,   setImagenUri]   = useState('');
     const [imagenAsset, setImagenAsset] = useState(null);
-    // Usar 0 para la tasa si falla la carga
-    const [tasa, setTasa] = useState(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isSaving, setIsSaving] = useState(false); // Para el botón Guardar
+    const [tasa,        setTasa]        = useState(null);
+    const [isLoading,   setIsLoading]   = useState(true);
+    const [isSaving,    setIsSaving]    = useState(false);
 
     useEffect(() => {
-        const cargarDatos = async () => {
+        const cargar = async () => {
             try {
-                // 1. Cargar Platillo
-                const datos = await obtenerPlatilloPorId(id);
+                const datos          = await obtenerPlatilloPorId(id);
                 if (!datos) throw new Error('Platillo no encontrado.');
-
-                // 2. Cargar Tasa (Asegurar que sea un número, si falla, null)
-                const tasaGuardadaString = await obtenerTasaDolar();
-                const tasaValor = Number(tasaGuardadaString) || null; // Null si no es un número válido
-
-                if (!tasaValor) {
-                    Alert.alert('Advertencia', 'No se pudo obtener la tasa de cambio. No se podrá guardar en Bs.');
-                }
+                const tasaStr        = await obtenerTasaDolar();
+                const tasaValor      = Number(tasaStr) || null;
 
                 setPlatillo(datos);
                 setNombre(datos.nombre);
                 setDescripcion(datos.descripcion || '');
                 setTasa(tasaValor);
-
-                // 3. Inicializar campos
-                if (datos.precio_usd !== undefined && datos.precio_usd !== null) {
+                if (datos.precio_usd != null) {
                     setMoneda('usd');
-                    // Conversión segura a String
                     setMonto(Number(datos.precio_usd).toFixed(2));
                 }
-
                 setImagenUri(datos.imagen_url || '');
-
-            } catch (error) {
-                console.error('Error al cargar datos:', error);
-                Alert.alert('Error Fatal', 'No se pudo cargar el platillo. Verifique la conexión: ' + error.message);
+            } catch (e) {
+                Alert.alert('Error', e.message);
                 navigation.goBack();
             } finally {
                 setIsLoading(false);
             }
         };
-
-        cargarDatos();
+        cargar();
     }, [id]);
 
     const seleccionarImagen = async () => {
-        const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.6 });
-        if (result.assets && result.assets.length > 0) {
-            const asset = result.assets[0];
-            setImagenAsset(asset);
-            setImagenUri(asset.uri);
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') { Alert.alert('Permiso denegado'); return; }
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: [ImagePicker.MediaType.Images],
+            allowsEditing: true,
+            quality: 0.7,
+        });
+        if (!result.canceled && result.assets?.length > 0) {
+            setImagenAsset(result.assets[0]);
+            setImagenUri(result.assets[0].uri);
         }
     };
 
     const handleGuardar = async () => {
         setIsSaving(true);
-        const montoNum = Number(monto); // Usar Number() para conversión segura
+        const montoNum = Number(monto);
+        if (!nombre.trim()) { Alert.alert('Error', 'El nombre es obligatorio.'); setIsSaving(false); return; }
+        if (isNaN(montoNum) || montoNum <= 0) { Alert.alert('Error', 'Precio inválido.'); setIsSaving(false); return; }
+        if (moneda === 'bs' && !tasa) { Alert.alert('Error', 'Sin tasa. Usa USD.'); setIsSaving(false); return; }
 
-        // --- VALIDACIONES ESTRICTAS ---
-        if (!nombre.trim()) {
-            Alert.alert('Error', 'El nombre del platillo es obligatorio.');
-            setIsSaving(false);
-            return;
-        }
-        if (isNaN(montoNum) || montoNum <= 0) {
-            Alert.alert('Error', 'Debe ingresar un precio válido y positivo.');
-            setIsSaving(false);
-            return;
-        }
-        if (moneda === 'bs' && !tasa) {
-            Alert.alert('Error', 'No se pudo cargar la tasa de cambio. Guarde el precio en USD.');
-            setIsSaving(false);
-            return;
-        }
-
-        // 1. Determinar el precio base en USD (único que guardaremos)
-        let precioUsd;
-        if (moneda === 'usd') {
-            precioUsd = montoNum;
-        } else { // moneda === 'bs'
-            // Usamos || 1 para evitar división por cero, aunque ya validamos que 'tasa' exista.
-            precioUsd = parseFloat((montoNum / (tasa || 1)).toFixed(2));
-        }
-
-        // 2. Subir nueva imagen si se seleccionó una
+        const precioUsd       = moneda === 'usd' ? montoNum : parseFloat((montoNum / (tasa || 1)).toFixed(2));
         let imagenUrlGuardada = platillo.imagen_url;
-        if (imagenAsset) {
-            try {
-                imagenUrlGuardada = await uploadAndGetUrl(
-                    imagenAsset.uri,
-                    imagenAsset.fileName || `imagen_${id}`,
-                    imagenAsset.type
-                );
-            } catch (e) {
-                // Si falla la subida, avisamos pero permitimos guardar el resto de los datos
-                Alert.alert('Error', 'No se pudo subir la nueva imagen. Se guardarán los datos de texto.');
-                imagenUrlGuardada = platillo.imagen_url;
-            }
-        }
 
-        // 3. Preparar el objeto para la ACTUALIZACIÓN
-        const platilloActualizado = {
-            nombre: nombre.trim(),
-            precio_usd: precioUsd,
-            descripcion: descripcion.trim(),
-            imagen_url: imagenUrlGuardada,
-            // Podrías añadir aquí 'activo' si lo usas en el formulario
-        };
+        if (imagenAsset) {
+            try { imagenUrlGuardada = await uploadAndGetUrl(imagenAsset.uri); }
+            catch (e) { Alert.alert('Error', 'No se pudo subir la imagen. Se guardan los datos de texto.'); }
+        }
 
         try {
-            // 4. Actualizar el registro en la base de datos
-            await actualizarPlatillo(id, platilloActualizado);
-
-            Alert.alert('✅ Éxito', 'Platillo actualizado exitosamente.');
+            await actualizarPlatillo(id, {
+                nombre:      nombre.trim(),
+                precio_usd:  precioUsd,
+                descripcion: descripcion.trim(),
+                imagen_url:  imagenUrlGuardada,
+            });
+            Alert.alert('✅', 'Platillo actualizado.');
             navigation.goBack();
-        } catch (error) {
-            Alert.alert('Error', 'Fallo en la conexión al actualizar el platillo.');
-            console.error('Error al actualizar platillo:', error);
+        } catch (e) {
+            Alert.alert('Error', 'No se pudo actualizar el platillo.');
         } finally {
             setIsSaving(false);
         }
@@ -188,108 +131,124 @@ const EditarPlatillos = ({ route, navigation }) => {
 
     if (isLoading || !platillo) {
         return (
-            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator size="large" color="#007AFF" />
-                <Text style={{ marginTop: 10 }}>Cargando platillo...</Text>
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f7f7f9' }}>
+                <ActivityIndicator size="large" color="#c21c1c" />
+                <Text style={{ marginTop: 12, color: '#888' }}>Cargando platillo…</Text>
             </View>
         );
     }
 
-    // Cálculos de precios seguros (usando Number() y || 0 para evitar fallos de NaN)
-    const montoBase = Number(monto) || 0;
-    const tasaActual = Number(tasa) || 0;
-
-    const precioUsdCalculado = moneda === 'usd' ? montoBase.toFixed(2) : (montoBase / (tasaActual || 1))?.toFixed(2) || '...';
-    const precioBsCalculado = moneda === 'bs' ? montoBase.toFixed(2) : (montoBase * tasaActual)?.toFixed(2) || '...';
-
+    const montoBase     = Number(monto) || 0;
+    const tasaActual    = Number(tasa)  || 0;
+    const precioUsdCalc = moneda === 'usd' ? montoBase : (montoBase / (tasaActual || 1));
+    const precioBsCalc  = moneda === 'bs'  ? montoBase : (montoBase * tasaActual);
+    const imageSrc      = imagenUri
+        ? { uri: imagenUri }
+        : DEFAULT_IMAGE_LOCAL;
 
     return (
-        <SafeAreaView style={{ flex: 1 }}>
-            <KeyboardAvoidingView
-                style={{ flex: 1 }}
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            >
+        <SafeAreaView style={styles.safeArea} edges={['bottom', 'left', 'right']}>
+            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 <ScrollView
-                    contentContainerStyle={[styles.container, { paddingBottom: 100 }]}
+                    contentContainerStyle={styles.scrollContent}
                     keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
                 >
-                    <TouchableOpacity
-                        style={styles.botonGuardarArribaDerecha}
-                        onPress={handleGuardar}
-                        disabled={isSaving}
-                    >
-                        <Text style={styles.textoBotonArribaDerecha}>
-                            {isSaving ? 'Guardando...' : '✔ Guardar'}
-                        </Text>
-                    </TouchableOpacity>
-
-                    {/* Mostrar Precios Calculados */}
-                    <View style={styles.resumenPrecios}>
-                        <Text style={styles.resumenTexto}>USD (Guardado): ${precioUsdCalculado}</Text>
-                        <Text style={styles.resumenTexto}>Bs (Estimado): Bs {precioBsCalculado}</Text>
-                        {tasaActual === 0 && <Text style={{ color: 'red', marginTop: 5 }}>Tasa de cambio no disponible.</Text>}
+                    {/* ── Header ── */}
+                    <View style={styles.headerBlock}>
+                        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+                            <Ionicons name="arrow-back" size={20} color="#fff" />
+                        </TouchableOpacity>
+                        <View style={styles.headerTexts}>
+                            <Text style={styles.headerTitulo}>Editar Platillo</Text>
+                            <Text style={styles.headerSubtitulo} numberOfLines={1}>{platillo.nombre}</Text>
+                        </View>
+                        <TouchableOpacity style={styles.saveBtn} onPress={handleGuardar} disabled={isSaving}>
+                            {isSaving
+                                ? <ActivityIndicator size="small" color="#fff" />
+                                : <Text style={styles.saveBtnText}>✔ Guardar</Text>
+                            }
+                        </TouchableOpacity>
                     </View>
 
-                    <Text style={styles.seccionTitulo}>Información del Platillo</Text>
+                    {/* ── Precios ── */}
+                    <View style={styles.preciosCard}>
+                        <View style={styles.precioChip}>
+                            <Text style={styles.precioChipLabel}>USD</Text>
+                            <Text style={styles.precioChipValor}>${precioUsdCalc.toFixed(2)}</Text>
+                        </View>
+                        <View style={styles.precioChipDivider} />
+                        <View style={styles.precioChip}>
+                            <Text style={styles.precioChipLabel}>Bolívares</Text>
+                            <Text style={styles.precioChipValor}>
+                                {tasaActual > 0 ? `Bs ${precioBsCalc.toFixed(2)}` : '—'}
+                            </Text>
+                        </View>
+                    </View>
 
-                    {/* ... (Resto de los inputs y picker) ... */}
+                    {/* ── Nombre ── */}
+                    <Text style={styles.seccionLabel}>Nombre del platillo</Text>
+                    <View style={styles.fieldCard}>
+                        <TextInput
+                            style={styles.fieldInput}
+                            placeholder="Nombre"
+                            placeholderTextColor="#ccc"
+                            value={nombre}
+                            onChangeText={setNombre}
+                        />
+                    </View>
 
-                    {/* Campo Nombre */}
-                    <Text style={styles.label}>Nombre del Platillo</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={nombre}
-                        onChangeText={setNombre}
-                    />
+                    {/* ── Moneda ── */}
+                    <Text style={styles.seccionLabel}>Moneda</Text>
+                    <View style={styles.fieldCard}>
+                        <Picker
+                            style={styles.picker}
+                            selectedValue={moneda}
+                            onValueChange={setMoneda}
+                            enabled={tasaActual > 0}
+                        >
+                            <Picker.Item label="Dólares (USD)" value="usd" />
+                            <Picker.Item label="Bolívares (Bs)" value="bs" />
+                        </Picker>
+                    </View>
 
-                    {/* Picker Moneda */}
-                    <Text style={styles.label}>Moneda del Precio</Text>
-                    <Picker
-                        selectedValue={moneda}
-                        onValueChange={setMoneda}
-                        style={styles.input}
-                        enabled={tasaActual !== 0} // Desactivar si no hay tasa para evitar errores
-                    >
-                        <Picker.Item label="Dólares (USD)" value="usd" />
-                        <Picker.Item label="Bolívares (Bs)" value="bs" />
-                    </Picker>
+                    {/* ── Precio ── */}
+                    <Text style={styles.seccionLabel}>Precio en {moneda === 'usd' ? 'USD' : 'Bs'}</Text>
+                    <View style={styles.fieldCard}>
+                        <TextInput
+                            style={styles.fieldInput}
+                            keyboardType="numeric"
+                            placeholder={moneda === 'usd' ? 'Ej: 4.50' : 'Ej: 180.00'}
+                            placeholderTextColor="#ccc"
+                            value={monto}
+                            onChangeText={(t) => setMonto(t.replace(/[^0-9.]/g, ''))}
+                        />
+                    </View>
 
-                    {/* Campo Monto */}
-                    <Text style={styles.label}>Monto en {moneda === 'usd' ? 'USD' : 'Bs'}</Text>
-                    <TextInput
-                        style={styles.input}
-                        keyboardType="numeric"
-                        value={monto}
-                        onChangeText={(text) => setMonto(text.replace(/[^0-9.]/g, ''))} // Limpieza de input
-                        placeholder={`Ej: ${moneda === 'usd' ? '4.50' : '180.00'}`}
-                    />
+                    {/* ── Descripción ── */}
+                    <Text style={styles.seccionLabel}>Descripción (opcional)</Text>
+                    <View style={styles.fieldCard}>
+                        <TextInput
+                            style={styles.fieldInputMultiline}
+                            multiline
+                            placeholder="Agrega una descripción…"
+                            placeholderTextColor="#ccc"
+                            value={descripcion}
+                            onChangeText={setDescripcion}
+                        />
+                    </View>
 
-                    {/* Campo Descripción */}
-                    <Text style={styles.label}>Descripción</Text>
-                    <TextInput
-                        style={[styles.input, { height: 80 }]}
-                        multiline
-                        value={descripcion}
-                        onChangeText={setDescripcion}
-                    />
-
-                    {/* Sección Imagen */}
-                    <Text style={styles.label}>Imagen del Platillo</Text>
-                    <TouchableOpacity style={styles.imageContainer} onPress={seleccionarImagen}>
-                        {imagenUri ? (
-                            <Image
-                                source={{ uri: imagenUri }}
-                                style={{ width: '100%', height: '100%', borderRadius: 10 }}
-                            />
-                        ) : (
-                            <Image
-                                source={DEFAULT_IMAGE_LOCAL}
-                                style={{ width: '100%', height: '100%', borderRadius: 10 }}
-                                resizeMode="cover"
-                            />
-                        )}
+                    {/* ── Imagen ── */}
+                    <Text style={styles.seccionLabel}>Imagen del platillo</Text>
+                    <TouchableOpacity style={styles.imageWrapper} onPress={seleccionarImagen} activeOpacity={0.9}>
+                        <Image source={imageSrc} style={styles.imageFullCover} resizeMode="cover" />
+                        <View style={styles.imageOverlay}>
+                            <Ionicons name="camera-outline" size={18} color="#fff" />
+                            <Text style={styles.imageOverlayText}>
+                                {imagenAsset ? 'Cambiar imagen' : 'Toca para cambiar imagen'}
+                            </Text>
+                        </View>
                     </TouchableOpacity>
-
                 </ScrollView>
             </KeyboardAvoidingView>
         </SafeAreaView>
