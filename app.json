@@ -4,11 +4,11 @@
     "slug": "fastfood",
     "version": "1.3.0",
     "orientation": "portrait",
-    "icon": "./assets/LaNegra.jpg",
+    "icon": "./assets/LaNegra.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/LaNegra.jpg",
+      "image": "./assets/LaNegra.png",
       "resizeMode": "cover",
       "backgroundColor": "#c21c1c"
     },
@@ -17,7 +17,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/LaNegra.jpg",
+        "foregroundImage": "./assets/LaNegra.png",
         "backgroundColor": "#c21c1c"
       },
       "permissions": [
