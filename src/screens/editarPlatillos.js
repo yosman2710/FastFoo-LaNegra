@@ -88,7 +88,7 @@ const EditarPlatillos = ({ route, navigation }) => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') { Alert.alert('Permiso denegado'); return; }
         const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: [ImagePicker.MediaType.Images],
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
             allowsEditing: true,
             quality: 0.7,
         });
