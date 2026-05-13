@@ -120,7 +120,7 @@ const GestionPlatillos = ({ navigation }) => {
     );
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={styles.container} edges={[]}>
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
 
                 {/* Header rojo con menú integrado */}

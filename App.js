@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { StatusBar } from 'react-native';
 
 import SplashScreen       from './src/screens/SplashScreen';
 import HomeScreen         from './src/screens/HomeScreen';
@@ -10,19 +11,15 @@ import DetallePlatillo    from './src/screens/detallePlatillo';
 import CrearPedido        from './src/screens/crearPedidos';
 import VerDetallesPedidos from './src/screens/verDetallesPedidos';
 import TabNavigator       from './src/navegation/tabNavegation';
+import { useImmersiveMode } from './src/hooks/useImmersiveMode';
 
 const Stack = createNativeStackNavigator();
 
-export default function App() {
-  const [splashDone, setSplashDone] = useState(false);
-
-  // Muestra el splash animado antes de montar el navigator
-  if (!splashDone) {
-    return <SplashScreen onFinish={() => setSplashDone(true)} />;
-  }
-
+function RootNavigator() {
+  useImmersiveMode();
   return (
     <NavigationContainer>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       <Stack.Navigator initialRouteName="Inicio">
         <Stack.Screen name="Inicio"          component={HomeScreen}         options={{ headerShown: false }} />
         <Stack.Screen name="CrearPlatillo"   component={CrearPlatillo}      options={{ headerShown: false }} />
@@ -34,4 +31,15 @@ export default function App() {
       </Stack.Navigator>
     </NavigationContainer>
   );
+}
+
+export default function App() {
+  const [splashDone, setSplashDone] = useState(false);
+
+  // Muestra el splash animado antes de montar el navigator
+  if (!splashDone) {
+    return <SplashScreen onFinish={() => setSplashDone(true)} />;
+  }
+
+  return <RootNavigator />;
 }

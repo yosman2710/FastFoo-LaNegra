@@ -9,9 +9,10 @@ import {
     Dimensions,
     StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+
+const STATUS_BAR_H = StatusBar.currentHeight ?? 24;
 
 const { width } = Dimensions.get('window');
 const RED = '#c21c1c';
@@ -66,8 +67,7 @@ export default function HomeScreen() {
     }, []);
 
     return (
-        <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-            <StatusBar barStyle="light-content" backgroundColor={RED} />
+        <View style={styles.safeArea}>
 
             {/* ── Hero ── */}
             <View style={styles.hero}>
@@ -137,7 +137,7 @@ export default function HomeScreen() {
                     <Text style={styles.btnText}>INICIAR GESTIÓN</Text>
                 </TouchableOpacity>
             </Animated.View>
-        </SafeAreaView>
+        </View>
     );
 }
 
@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
 
     // ── Hero ──────────────────────────────────────────────
     hero: {
-        height: 280,
+        height: 280 + STATUS_BAR_H,
         justifyContent: 'flex-end',
         alignItems: 'center',
         paddingBottom: 24,
@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
     },
     logoWrap: {
         position: 'absolute',
-        top: 30,
+        top: STATUS_BAR_H + 16,
         alignSelf: 'center',
         alignItems: 'center',
         justifyContent: 'center',

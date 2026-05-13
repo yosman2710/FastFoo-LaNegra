@@ -8,7 +8,10 @@ import {
     ScrollView,
     ActivityIndicator,
     Alert,
+    StatusBar,
 } from 'react-native';
+
+const STATUS_BAR_H = StatusBar.currentHeight ?? 24;
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { obtenerPlatilloPorId, eliminarPlatillo } from '../services/dishService.js';
@@ -172,7 +175,7 @@ const styles = StyleSheet.create({
     },
     backBtn: {
         position: 'absolute',
-        top: 48,
+        top: (STATUS_BAR_H ?? 24) + 16,
         left: 16,
         backgroundColor: 'rgba(0,0,0,0.45)',
         width: 40,

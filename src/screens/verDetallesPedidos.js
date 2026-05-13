@@ -13,6 +13,7 @@ import {
     KeyboardAvoidingView,
     Platform,
     Pressable,
+    StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Picker } from '@react-native-picker/picker';
@@ -181,7 +182,7 @@ const PedidoDetalle = ({ route, navigation }) => {
     };
 
     return (
-        <SafeAreaView style={s.safeArea} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={s.safeArea} edges={['left', 'right']}>
 
             {/* ── Header custom con back ── */}
             <View style={s.header}>
@@ -356,7 +357,7 @@ const s   = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 16,
-        paddingTop: 14,
+        paddingTop: (StatusBar.currentHeight ?? 24) + 14,
         paddingBottom: 18,
         borderBottomLeftRadius: 24,
         borderBottomRightRadius: 24,

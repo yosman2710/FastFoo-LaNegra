@@ -79,7 +79,7 @@ export default function SplashScreen({ onFinish }) {
 
     return (
         <Animated.View style={[styles.container, { opacity: exitOpacity }]}>
-            <StatusBar barStyle="light-content" backgroundColor="#c21c1c" />
+            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
             {/* Fondo con Ken Burns */}
             <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ scale: bgScale }] }]}>

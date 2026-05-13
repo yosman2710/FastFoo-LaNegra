@@ -10,6 +10,7 @@ import {
     ActivityIndicator,
     KeyboardAvoidingView,
     Platform,
+    StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -123,7 +124,7 @@ const CrearPedido = ({ navigation }) => {
     const total = calcularTotal();
 
     return (
-        <SafeAreaView style={s.safeArea} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={s.safeArea} edges={['bottom', 'left', 'right']}>
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
 
                 {/* ── Header rojo con back ── */}
@@ -231,7 +232,7 @@ const s = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 16,
-        paddingTop: 14,
+        paddingTop: (StatusBar.currentHeight ?? 24) + 14,
         paddingBottom: 18,
         borderBottomLeftRadius: 24,
         borderBottomRightRadius: 24,

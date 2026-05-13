@@ -8,6 +8,7 @@ import {
     TouchableOpacity,
     Alert,
     ActivityIndicator,
+    StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -152,7 +153,7 @@ const GestionPedidos = ({ navigation }) => {
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={styles.container} edges={[]}>
 
             {/* Header rojo con menú integrado */}
             <View style={styles.header}>

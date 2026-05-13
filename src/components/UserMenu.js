@@ -12,6 +12,7 @@ import {
     Platform,
     Pressable,
     useRef,
+    StatusBar,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { obtenerTasaDolar, actualizarTasaDolar } from '../services/configService.js';
@@ -157,7 +158,7 @@ const styles = StyleSheet.create({
     overlay: {
         flex: 1,
         alignItems: 'flex-end',
-        paddingTop: 80,
+        paddingTop: (StatusBar.currentHeight ?? 24) + 60,
         paddingRight: 16,
     },
     dropdown: {

@@ -1,4 +1,6 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, StatusBar } from 'react-native';
+
+const STATUS_BAR_H = StatusBar.currentHeight ?? 24;
 
 export const styles = StyleSheet.create({
     // ─── Layout ───
@@ -9,7 +11,7 @@ export const styles = StyleSheet.create({
     // ─── Header ───
     header: {
         backgroundColor: '#c21c1c',
-        paddingTop: 20,
+        paddingTop: (STATUS_BAR_H ?? 24) + 14,
         paddingBottom: 20,
         paddingHorizontal: 20,
         borderBottomLeftRadius: 28,

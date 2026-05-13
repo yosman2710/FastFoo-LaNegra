@@ -1,4 +1,6 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, StatusBar } from 'react-native';
+
+const STATUS_BAR_H = StatusBar.currentHeight ?? 24;
 
 const RED = '#c21c1c';
 const BG  = '#f7f7f9';
@@ -16,7 +18,7 @@ export const styles = StyleSheet.create({
     // ── Header rojo ──────────────────────────────────────
     headerBlock: {
         backgroundColor: RED,
-        paddingTop: 20,
+        paddingTop: (STATUS_BAR_H ?? 24) + 14,
         paddingBottom: 28,
         paddingHorizontal: 16,
         borderBottomLeftRadius: 28,
